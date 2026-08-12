@@ -1,0 +1,40 @@
+# opencode workspace scaffolding
+.opencode/
+docs/
+prompts/
+opencode.json
+
+# misc
+assets/resume.pdf
+
+# Flutter/Dart
+.dart_tool/
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+*.log
+
+# Android
+/android/.gradle/
+/android/local.properties
+/android/key.properties
+
+# iOS/macOS
+/ios/Pods/
+/ios/.symlinks/
+/macos/Pods/
+*.xcuserdata/
+
+# Windows/Linux build output
+/windows/flutter/ephemeral/
+/linux/flutter/ephemeral/
+
+# Node/backend (backend/.gitignore also covers .env and node_modules)
+node_modules/
+.env
+.env.local
+coverage/
