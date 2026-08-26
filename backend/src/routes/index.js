@@ -21,6 +21,15 @@ router.get('/status', (req, res) => {
   });
 });
 
+router.get('/debug/ytdlp', async (req, res, next) => {
+  try {
+    const { diagnose } = require('../services/youtubeService');
+    res.json(await diagnose());
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.use('/auth', authRoutes);
 router.use('/songs', songRoutes);
 router.use('/playlists', playlistRoutes);

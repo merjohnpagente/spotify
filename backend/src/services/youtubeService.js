@@ -1,5 +1,5 @@
 const fs = require('fs');
-const ytDlpModule = require('yt-dlp-exec');
+const { execFile } = require('child_process');
 const config = require('../config');
 const { cacheGet, cacheSet } = require('../config/redis');
 
@@ -12,11 +12,43 @@ const CACHE_TTL = {
 
 // Prefer an explicitly configured binary (YT_DLP_PATH) so deploys can ship
 // a fresh yt-dlp - YouTube extraction breaks quickly with stale versions.
+// The custom binary is probed once (`--version`); if it is broken we fall
+// back to the yt-dlp-exec module binary automatically.
 const configuredBinary = config.audio.ytDlpPath || config.youtube.ytDlpPath || '';
-const ytDlp =
-  configuredBinary && fs.existsSync(configuredBinary)
-    ? ytDlpModule.create(configuredBinary)
-    : ytDlpModule;
+const customBinaryExists = configuredBinary && fs.existsSync(configuredBinary);
+const ytDlpModule = require('yt-dlp-exec');
+
+let binaryChoicePromise = null;
+const resolveBinary = () => {
+  if (!binaryChoicePromise) {
+    binaryChoicePromise = (async () => {
+      if (customBinaryExists) {
+        try {
+          const version = await new Promise((resolve, reject) => {
+            execFile(configuredBinary, ['--version'], { timeout: 20000 }, (err, stdout) => {
+              if (err) reject(err);
+              else resolve(String(stdout).trim());
+            });
+          });
+          console.log(`yt-dlp: using configured binary ${configuredBinary} (v${version})`);
+          return { runner: ytDlpModule.create(configuredBinary), label: configuredBinary };
+        } catch (error) {
+          console.warn(`yt-dlp: configured binary probe failed (${error.message}), falling back to module binary`);
+        }
+      }
+      console.log('yt-dlp: using yt-dlp-exec module binary');
+      return { runner: ytDlpModule, label: 'module' };
+    })();
+  }
+  return binaryChoicePromise;
+};
+
+let activeRunner = null;
+const getRunner = async () => {
+  if (!activeRunner) activeRunner = await resolveBinary();
+  return activeRunner;
+};
+
 const YTDLP_BIN = configuredBinary || 'yt-dlp';
 const TRENDING_PLAYLIST_URL = config.youtube.trendingPlaylistUrl;
 
@@ -44,26 +76,66 @@ const release = () => {
   }
 };
 
+const runWithRunner = (runner, url, options) => {
+  let timer;
+  return Promise.race([
+    runner(url, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      noCallHome: true,
+      noCheckCertificate: true,
+      socketTimeout: 30,
+      ...options,
+    }),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('yt-dlp timed out')), 90000);
+    }),
+  ]).finally(() => clearTimeout(timer));
+};
+
 const runYtDlp = async (url, options = {}) => {
   await acquire();
   try {
-    const data = await Promise.race([
-      ytDlp(url, {
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCallHome: true,
-        noCheckCertificate: true,
-        socketTimeout: 30,
-        ...options,
-      }),
-      new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('yt-dlp timed out')), 90000);
-      }),
-    ]);
-    return data;
+    const primary = await getRunner();
+    try {
+      return await runWithRunner(primary.runner, url, options);
+    } catch (primaryError) {
+      // If the configured binary misbehaves, retry once with the module's
+      // own binary and stick with it while it keeps working.
+      if (primary.label !== 'module') {
+        console.warn(`yt-dlp: configured binary failed ("${primaryError.message}"), retrying with module binary`);
+        const fallback = { runner: ytDlpModule, label: 'module' };
+        const result = await runWithRunner(fallback.runner, url, options);
+        activeRunner = fallback;
+        return result;
+      }
+      throw primaryError;
+    }
   } finally {
     release();
   }
+};
+
+// Deep diagnostic used by GET /api/debug/ytdlp - tells us exactly which
+// binary is in play and whether a minimal search works right now.
+const diagnose = async () => {
+  const started = Date.now();
+  const active = await getRunner();
+  const out = {
+    configuredBinary: configuredBinary || null,
+    configuredBinaryExists: customBinaryExists,
+    usingBinary: active.label,
+    search: null,
+    durationMs: null,
+  };
+  try {
+    const songs = await searchSongs('adele hello', 1);
+    out.search = songs.length ? 'ok' : 'empty';
+  } catch (error) {
+    out.search = `failed: ${error.message}`;
+  }
+  out.durationMs = Date.now() - started;
+  return out;
 };
 
 const searchSongs = async (query, limit = 20) => {
@@ -258,5 +330,6 @@ module.exports = {
   getRecommendations,
   searchByGenre,
   runYtDlp,
+  diagnose,
   YTDLP_BIN,
 };
