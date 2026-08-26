@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/music_providers.dart';
-import 'package:spotify_fy/providers/player_provider.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
 import 'package:spotify_fy/widgets/search_result_card.dart';

@@ -14,7 +14,16 @@ let server = null;
 
 const start = async () => {
   try {
-    await connectDB();
+    try {
+      await connectDB();
+    } catch (dbError) {
+      // Keep serving music even if MongoDB is unreachable - only
+      // accounts/likes/history/playlists require the database.
+      console.warn(
+        'WARNING: Starting without MongoDB. Music search & playback still work, ' +
+          'but sign-in, likes, history and playlists are disabled until the DB is reachable.'
+      );
+    }
     connectRedis();
     initializeFirebase();
 

@@ -10,7 +10,14 @@ const extractAudioUrl = async (videoId) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached.url;
 
-  const song = await Song.findOne({ videoId });
+  // MongoDB read is best-effort: if the DB is unavailable we still
+  // want to serve audio straight from YouTube.
+  let song = null;
+  try {
+    song = await Song.findOne({ videoId });
+  } catch (dbError) {
+    console.warn('MongoDB unavailable while reading audio cache:', dbError.message);
+  }
   if (song && song.isAudioCacheValid()) {
     await cacheSet(cacheKey, { url: song.audioUrlCached }, AUDIO_CACHE_TTL);
     return song.audioUrlCached;
@@ -18,7 +25,7 @@ const extractAudioUrl = async (videoId) => {
 
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    
+
     const result = await ytDlp(url, {
       dumpSingleJson: true,
       noWarnings: true,
@@ -35,11 +42,17 @@ const extractAudioUrl = async (videoId) => {
 
     const audioUrl = audioFormat.url;
 
-    await Song.findOneAndUpdate(
-      { videoId },
-      { audioUrlCached: audioUrl, audioExtractedAt: new Date() },
-      { upsert: true, new: true }
-    );
+    // Persisting to MongoDB is best-effort too - never fail playback
+    // because the DB write failed.
+    try {
+      await Song.findOneAndUpdate(
+        { videoId },
+        { audioUrlCached: audioUrl, audioExtractedAt: new Date() },
+        { upsert: true, new: true }
+      );
+    } catch (dbError) {
+      console.warn('MongoDB unavailable while caching audio URL:', dbError.message);
+    }
 
     await cacheSet(cacheKey, { url: audioUrl }, AUDIO_CACHE_TTL);
     return audioUrl;
@@ -58,10 +71,14 @@ const getCachedAudioUrl = async (videoId) => {
 };
 
 const incrementAccessCount = async (videoId) => {
-  await Song.findOneAndUpdate(
-    { videoId },
-    { $inc: { accessCount: 1 } }
-  );
+  try {
+    await Song.findOneAndUpdate(
+      { videoId },
+      { $inc: { accessCount: 1 } }
+    );
+  } catch (dbError) {
+    console.warn('MongoDB unavailable while counting access:', dbError.message);
+  }
 };
 
 module.exports = {

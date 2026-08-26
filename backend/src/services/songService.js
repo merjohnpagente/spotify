@@ -10,6 +10,26 @@ const CACHE_TTL = {
   RECOMMENDATIONS: 24 * 60 * 60,
 };
 
+// Persist a YouTube song in MongoDB; if the DB is unavailable, degrade
+// gracefully and serve the YouTube data directly so music keeps playing.
+const upsertSong = async (ytData) => {
+  try {
+    let song = await Song.findOne({ videoId: ytData.videoId });
+    if (!song) {
+      song = await Song.create({ ...ytData, addedToSystemAt: new Date() });
+    }
+    return song.toPublicJSON();
+  } catch (dbError) {
+    console.warn('MongoDB unavailable, serving song without caching:', dbError.message);
+    return {
+      id: null,
+      isAvailable: true,
+      addedToSystemAt: new Date(),
+      ...ytData,
+    };
+  }
+};
+
 const getOrCreateSong = async (videoId) => {
   let song = await Song.findOne({ videoId });
   
@@ -35,11 +55,7 @@ const searchSongsService = async (query, limit = 20) => {
   
   const songs = [];
   for (const ytSong of youtubeResults) {
-    let song = await Song.findOne({ videoId: ytSong.videoId });
-    if (!song) {
-      song = await Song.create({ ...ytSong, addedToSystemAt: new Date() });
-    }
-    songs.push(song.toPublicJSON());
+    songs.push(await upsertSong(ytSong));
   }
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
@@ -55,11 +71,7 @@ const getTrendingSongsService = async (limit = 30) => {
   
   const songs = [];
   for (const ytSong of youtubeResults) {
-    let song = await Song.findOne({ videoId: ytSong.videoId });
-    if (!song) {
-      song = await Song.create({ ...ytSong, addedToSystemAt: new Date() });
-    }
-    songs.push(song.toPublicJSON());
+    songs.push(await upsertSong(ytSong));
   }
 
   await cacheSet(cacheKey, songs, CACHE_TTL.TRENDING);
@@ -71,11 +83,24 @@ const getSongByIdService = async (videoId) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  const song = await getOrCreateSong(videoId);
-  const result = song.toPublicJSON();
-  
-  await cacheSet(cacheKey, result, CACHE_TTL.SONG);
-  return result;
+  try {
+    const song = await getOrCreateSong(videoId);
+    const result = song.toPublicJSON();
+    
+    await cacheSet(cacheKey, result, CACHE_TTL.SONG);
+    return result;
+  } catch (dbError) {
+    // MongoDB unavailable (or song missing): fall back to YouTube data
+    const youtubeData = await getSongById(videoId);
+    if (!youtubeData) throw new Error('Song not found on YouTube');
+    console.warn('MongoDB unavailable, serving song from YouTube:', dbError.message);
+    return {
+      id: null,
+      isAvailable: true,
+      addedToSystemAt: new Date(),
+      ...youtubeData,
+    };
+  }
 };
 
 const getSongStreamUrl = async (videoId) => {
@@ -92,11 +117,7 @@ const getRecommendationsService = async (videoId, limit = 10) => {
   
   const songs = [];
   for (const rec of recommendations) {
-    let song = await Song.findOne({ videoId: rec.videoId });
-    if (!song) {
-      song = await Song.create({ ...rec, addedToSystemAt: new Date() });
-    }
-    songs.push(song.toPublicJSON());
+    songs.push(await upsertSong(rec));
   }
 
   await cacheSet(cacheKey, songs, CACHE_TTL.RECOMMENDATIONS);
@@ -112,11 +133,7 @@ const getSongsByGenre = async (genre, limit = 20) => {
   
   const songs = [];
   for (const ytSong of youtubeResults) {
-    let song = await Song.findOne({ videoId: ytSong.videoId });
-    if (!song) {
-      song = await Song.create({ ...ytSong, addedToSystemAt: new Date() });
-    }
-    songs.push(song.toPublicJSON());
+    songs.push(await upsertSong(ytSong));
   }
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);

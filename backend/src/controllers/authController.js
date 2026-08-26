@@ -1,10 +1,15 @@
-const { auth } = require('../services');
+const { auth, email } = require('../services');
 
 const register = async (req, res, next) => {
   try {
-    const { email, password, username, firstName, lastName } = req.body;
-    const result = await auth.registerWithEmail(email, password, username, firstName, lastName);
-    await auth.email.sendWelcomeEmail(email, username);
+    const { email: userEmail, password, username, firstName, lastName } = req.body;
+    const result = await auth.registerWithEmail(userEmail, password, username, firstName, lastName);
+    // Welcome email is best-effort - never fail an already-created account.
+    try {
+      await email.sendWelcomeEmail(userEmail, username);
+    } catch (mailError) {
+      console.warn('Welcome email failed:', mailError.message);
+    }
     res.status(201).json(result);
   } catch (error) {
     next(error);
@@ -53,8 +58,9 @@ const logout = async (req, res, next) => {
 
 const forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
-    await auth.getUserProfile(email);
+    const { email: userEmail } = req.body;
+    const { User } = require('../models');
+    await User.findOne({ email: userEmail });
     // In a real app, generate a reset token and send email
     // For now, just return success
     res.json({ message: 'If the email exists, a reset link has been sent' });

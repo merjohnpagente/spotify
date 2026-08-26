@@ -19,6 +19,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
   bool _isSubmitting = false;
+  bool _isGoogleLoading = false;
 
   @override
   void dispose() {
@@ -140,6 +141,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   text: 'Continue with Google',
                   icon: Icons.g_mobiledata,
                   onPressed: _handleGoogleSignIn,
+                  loading: _isGoogleLoading,
                 ),
                 const SizedBox(height: 32),
                 Row(
@@ -265,13 +267,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _handleGoogleSignIn() {
-    // Google Sign-In requires Firebase credentials; keeping the demo behavior.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Google Sign-In not available yet'),
-        backgroundColor: SpotifyColors.cardBackground,
-      ),
-    );
+  Future<void> _handleGoogleSignIn() async {
+    if (_isGoogleLoading) return;
+    setState(() => _isGoogleLoading = true);
+
+    final success = await ref.read(authProvider.notifier).signInWithGoogle();
+
+    if (!mounted) return;
+    setState(() => _isGoogleLoading = false);
+
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      // error == null means the user cancelled the Google dialog - stay quiet.
+      final error = ref.read(authProvider).error;
+      if (error != null) _showError(error);
+    }
   }
 }

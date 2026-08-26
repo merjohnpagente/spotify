@@ -1,12 +1,25 @@
 import 'package:spotify_fy/models/user_profile.dart';
 import 'package:spotify_fy/services/api_client.dart';
 
+/// Result of a successful sign-in: the user plus their session tokens.
+class AuthSession {
+  final UserProfile user;
+  final String accessToken;
+  final String refreshToken;
+
+  const AuthSession({
+    required this.user,
+    required this.accessToken,
+    required this.refreshToken,
+  });
+}
+
 class AuthService {
   final ApiClient _api;
 
   AuthService(this._api);
 
-  Future<UserProfile> register({
+  Future<AuthSession> register({
     required String email,
     required String password,
     required String username,
@@ -20,10 +33,10 @@ class AuthService {
       'firstName': firstName,
       'lastName': lastName,
     }, auth: false);
-    return _sessionResult(data);
+    return _session(data);
   }
 
-  Future<UserProfile> login({
+  Future<AuthSession> login({
     required String email,
     required String password,
   }) async {
@@ -31,7 +44,15 @@ class AuthService {
       'email': email,
       'password': password,
     }, auth: false);
-    return _sessionResult(data);
+    return _session(data);
+  }
+
+  /// Exchanges a Firebase ID token (from Google sign-in) for app tokens.
+  Future<AuthSession> googleLogin(String idToken) async {
+    final data = await _api.post('/api/auth/google', body: {
+      'idToken': idToken,
+    }, auth: false);
+    return _session(data);
   }
 
   Future<void> logout(String refreshToken) async {
@@ -52,7 +73,11 @@ class AuthService {
     return UserProfile.fromJson(data as Map<String, dynamic>);
   }
 
-  UserProfile _sessionResult(Map<String, dynamic> data) {
-    return UserProfile.fromJson(data['user'] as Map<String, dynamic>);
+  AuthSession _session(Map<String, dynamic> data) {
+    return AuthSession(
+      user: UserProfile.fromJson(data['user'] as Map<String, dynamic>),
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
   }
 }

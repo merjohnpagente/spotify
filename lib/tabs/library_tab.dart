@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:spotify_fy/models/playlist.dart';
-import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/services/playlist_service.dart';
@@ -36,7 +34,11 @@ class LibraryTab extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add, color: SpotifyColors.textPrimary, size: 28),
+            icon: const Icon(
+              Icons.add,
+              color: SpotifyColors.textPrimary,
+              size: 28,
+            ),
             onPressed: () => _createPlaylist(context, ref, playlistService),
           ),
         ],
@@ -62,7 +64,9 @@ class LibraryTab extends ConsumerWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const LikedSongsScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const LikedSongsScreen(),
+                  ),
                 );
               },
             ),
@@ -89,7 +93,10 @@ class LibraryTab extends ConsumerWidget {
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: Text(
                         'No playlists yet. Tap + to create one.',
-                        style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+                        style: TextStyle(
+                          color: SpotifyColors.textSecondary,
+                          fontSize: 14,
+                        ),
                       ),
                     )
                   : ListView.builder(
@@ -108,8 +115,9 @@ class LibraryTab extends ConsumerWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    PlaylistDetailScreen(playlistId: playlist.id),
+                                builder: (context) => PlaylistDetailScreen(
+                                  playlistId: playlist.id,
+                                ),
                               ),
                             );
                           },
@@ -119,7 +127,9 @@ class LibraryTab extends ConsumerWidget {
               loading: () => const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
-                  child: CircularProgressIndicator(color: SpotifyColors.primaryAccent),
+                  child: CircularProgressIndicator(
+                    color: SpotifyColors.primaryAccent,
+                  ),
                 ),
               ),
               error: (e, _) => Padding(
@@ -128,7 +138,10 @@ class LibraryTab extends ConsumerWidget {
                   children: [
                     const Text(
                       'Could not load playlists',
-                      style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+                      style: TextStyle(
+                        color: SpotifyColors.textSecondary,
+                        fontSize: 14,
+                      ),
                     ),
                     TextButton(
                       onPressed: () => ref.invalidate(myPlaylistsProvider),
@@ -147,7 +160,11 @@ class LibraryTab extends ConsumerWidget {
     );
   }
 
-  void _createPlaylist(BuildContext context, WidgetRef ref, PlaylistService service) {
+  void _createPlaylist(
+    BuildContext context,
+    WidgetRef ref,
+    PlaylistService service,
+  ) {
     final controller = TextEditingController();
     showDialog<void>(
       context: context,

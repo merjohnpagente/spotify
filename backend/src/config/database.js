@@ -14,13 +14,16 @@ const connectDB = async () => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      // Fail immediately when disconnected instead of buffering queries
+      // forever - lets callers fall back to YouTube-only mode.
+      bufferCommands: false,
     });
 
     isConnected = true;
     console.log(`MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
+    console.error('MongoDB connection error:', error.message);
+    throw error;
   }
 };
 

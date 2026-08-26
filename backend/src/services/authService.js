@@ -87,6 +87,14 @@ const loginWithGoogle = async (idToken) => {
   const decoded = await verifyIdToken(idToken);
   const { uid, email, name, picture } = decoded;
 
+  // Prevent account takeover via unverified emails: Firebase allows
+  // password accounts with unverified addresses. Only trust verified ones.
+  if (!email || decoded.email_verified !== true) {
+    const err = new Error('Google account email is not verified');
+    err.statusCode = 401;
+    throw err;
+  }
+
   let user = await User.findOne({ email });
   
   if (!user) {

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "128394834246",
+    "project_id": "spotify-ee119",
+    "storage_bucket": "spotify-ee119.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:128394834246:android:efb721612b4050ad01b547",
+        "android_client_info": {
+          "package_name": "spitify.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "128394834246-fr2b1hk88mjs520bnl5qoh0pnkho8gua.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBITnlarJVd8ML9-DLuQ6CbfPPCcNzZ7Bo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "128394834246-fr2b1hk88mjs520bnl5qoh0pnkho8gua.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
