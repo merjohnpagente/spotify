@@ -173,12 +173,9 @@ const diagnose = async (opts = {}) => {
     }
     out.stream = `ok (${Date.now() - t0}ms)`;
   } catch (error) {
-    out.stream = `failed: ${String(error.message).split('\n')[0].slice(0, 160)}`;
-    // The real reason (bot-check, format, PO token...) lives in stderr.
-    const stderr = error.stderr || (error.message && error.message.includes('ERROR:')
-      ? error.message.slice(error.message.indexOf('ERROR:'))
-      : null);
-    if (stderr) out.streamError = String(stderr).slice(0, 600);
+    out.stream = `failed: ${String(error.message).slice(0, 500)}`;
+    if (error.code) out.errorCode = error.code;
+    if (error.stderr) out.streamError = String(error.stderr).slice(0, 600);
   }
 
   out.durationMs = Date.now() - started;
