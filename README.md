@@ -14,7 +14,7 @@ The web build auto-deploys to **https://merjohnpagente.github.io/spotify/** on e
 One-time setup:
 
 1. Repo **Settings -> Pages -> Build and deployment -> Source: GitHub Actions**, then re-run the *Deploy to GitHub Pages* workflow.
-2. The web app needs the API online. Free option: deploy `backend/` to [Render](https://render.com) using `backend/render.yaml` (Blueprint). Then set repo variable **`API_BASE_URL`** = your Render URL (`Settings -> Secrets and variables -> Actions -> Variables`) and re-run the workflow.
+2. The web app needs the API online. Free option: deploy `backend/` to [Render](https://render.com) using the root `render.yaml` (Blueprint). Then set repo variable **`API_BASE_URL`** = your Render URL (`Settings -> Secrets and variables -> Actions -> Variables`) and re-run the workflow.
 3. In MongoDB Atlas -> Network Access, allow access from anywhere (`0.0.0.0/0`) so Render's servers can connect.
 
 > Note: "Continue with Google" only works in the Android/iOS apps (Firebase config); on web use email/password sign-in.
