@@ -1,0 +1,32 @@
+# Render Blueprint - deploys the API free on https://spotify-fy-api.onrender.com
+# Import: Render Dashboard > New > Blueprint > select this repo.
+# You will be asked to paste MONGODB_URI (from MongoDB Atlas > Connect > Drivers).
+
+services:
+  - type: web
+    name: spotify-fy-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRY
+        value: 1h
+      - key: JWT_REFRESH_EXPIRY
+        value: 30d
+      # Only allow the GitHub Pages site in production CORS.
+      - key: FRONTEND_URL
+        value: https://merjohnpagente.github.io
+      # Firebase ID-token verification for Google sign-in (public certs, no keys needed).
+      - key: FIREBASE_PROJECT_ID
+        value: spotify-ee119

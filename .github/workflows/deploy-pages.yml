@@ -1,0 +1,75 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Project pages are served under /<repo>/ - rewrite base href after build.
+      # Point the app at the deployed API by setting the API_BASE_URL repo variable
+      # (Settings > Secrets and variables > Actions > Variables).
+      - name: Build web release
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          if [ -n "$API_BASE_URL" ]; then
+            flutter build web --release --dart-define=API_BASE_URL="$API_BASE_URL"
+            echo "Built with API_BASE_URL=$API_BASE_URL"
+          else
+            flutter build web --release
+            echo "WARNING: API_BASE_URL repo variable not set - app will call http://localhost:3000"
+          fi
+          sed -i "s|<base href=\"[^\"]*\">|<base href=\"/${REPO_NAME}/\">|" build/web/index.html
+
+      # Ship the prebuilt Android APK alongside the site so anyone can install:
+      # https://merjohnpagente.github.io/spotify/SpotifyFY.apk
+      - name: Include Android APK download
+        run: |
+          if [ -f releases/SpotifyFY.apk ]; then
+            cp releases/SpotifyFY.apk build/web/SpotifyFY.apk
+            echo '<a id="apk-link" href="SpotifyFY.apk"></a>' >> /dev/null
+          else
+            echo "No APK committed yet - skipping"
+          fi
+
+      - name: Ensure .nojekyll
+        run: touch build/web/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

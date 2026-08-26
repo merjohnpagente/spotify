@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'api_base_url_stub.dart' if (dart.library.io) 'api_base_url_io.dart';
 import 'token_store.dart';
 
 class ApiException implements Exception {
@@ -32,8 +31,7 @@ class ApiClient {
   static String get defaultBaseUrl {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
-    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:3000';
-    return 'http://localhost:3000';
+    return resolveDefaultBaseUrl();
   }
 
   Map<String, String> _headers({bool auth = true}) {
@@ -100,10 +98,15 @@ class ApiClient {
         default:
           throw ArgumentError('Unsupported method: $method');
       }
-    } on SocketException {
-      throw ApiException(0, 'Cannot reach server ($baseUrl). Is the backend running?');
     } on TimeoutException {
       throw const ApiException(0, 'Request timed out. Please try again.');
+    } catch (e) {
+      // Network failures (SocketException & friends). Matched by message so
+      // this file also compiles for web, where dart:io is unavailable.
+      if (_isNetworkError(e)) {
+        throw ApiException(0, 'Cannot reach server ($baseUrl). Is the backend running?');
+      }
+      rethrow;
     }
 
     if (response.statusCode == 401 && !retried && auth) {
@@ -168,6 +171,17 @@ class ApiClient {
     }
 
     throw ApiException(response.statusCode, message, code: code);
+  }
+
+  bool _isNetworkError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('socketexception') ||
+        text.contains('connection refused') ||
+        text.contains('connection aborted') ||
+        text.contains('failed host lookup') ||
+        text.contains('network is unreachable') ||
+        text.contains('software caused connection abort') ||
+        text.contains('connection closed');
   }
 
   void dispose() {

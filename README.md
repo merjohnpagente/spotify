@@ -7,6 +7,18 @@ A full-stack music streaming app: Flutter frontend + Node.js backend that stream
 1. **Backend** (`backend/`) - Express API. Searches YouTube with `yt-dlp`, extracts direct audio stream URLs, and serves them to the app. MongoDB stores accounts, likes, history and playlists.
 2. **Frontend** (`lib/`) - Flutter app. Search a song -> tap it -> it plays instantly (Spotify-style), plus Home/trending, genres, liked songs, history and playlists.
 
+## Live demo (GitHub Pages)
+
+The web build auto-deploys to **https://merjohnpagente.github.io/spotify/** on every push to `main` via `.github/workflows/deploy-pages.yml`.
+
+One-time setup:
+
+1. Repo **Settings -> Pages -> Build and deployment -> Source: GitHub Actions**, then re-run the *Deploy to GitHub Pages* workflow.
+2. The web app needs the API online. Free option: deploy `backend/` to [Render](https://render.com) using `backend/render.yaml` (Blueprint). Then set repo variable **`API_BASE_URL`** = your Render URL (`Settings -> Secrets and variables -> Actions -> Variables`) and re-run the workflow.
+3. In MongoDB Atlas -> Network Access, allow access from anywhere (`0.0.0.0/0`) so Render's servers can connect.
+
+> Note: "Continue with Google" only works in the Android/iOS apps (Firebase config); on web use email/password sign-in.
+
 ## Running the app
 
 ### 1. Start the backend
