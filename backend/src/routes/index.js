@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const authRoutes = require('./auth.routes');
 const songRoutes = require('./song.routes');
 const playlistRoutes = require('./playlist.routes');
@@ -7,7 +8,17 @@ const userRoutes = require('./user.routes');
 const router = express.Router();
 
 router.get('/status', (req, res) => {
-  res.json({ status: 'ok', service: 'spotify-clone-api' });
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  res.json({
+    status: 'ok',
+    service: 'spotify-clone-api',
+    database: {
+      // Boolean only - never expose the URI itself.
+      uriConfigured: Boolean(process.env.MONGODB_URI),
+      state: states[mongoose.connection.readyState] || 'unknown',
+    },
+    uptime: process.uptime(),
+  });
 });
 
 router.use('/auth', authRoutes);
