@@ -1,12 +1,17 @@
 require('dotenv').config();
 
+// Tolerate common paste mistakes in env values: surrounding quotes,
+// backticks and stray whitespace break mongodb:// URIs otherwise.
+const cleanEnv = (value) =>
+  (value || '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+
 module.exports = {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 30000,
   
   mongodb: {
-    uri: process.env.MONGODB_URI,
+    uri: cleanEnv(process.env.MONGODB_URI) || undefined,
   },
   
   firebase: {

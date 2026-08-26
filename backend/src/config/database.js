@@ -10,6 +10,11 @@ const connectDB = async () => {
   }
 
   try {
+    if (!config.mongodb.uri || !/^mongodb(\+srv)?:\/\//.test(config.mongodb.uri)) {
+      throw new Error(
+        'MONGODB_URI is missing or malformed - it must start with "mongodb://" or "mongodb+srv://"'
+      );
+    }
     const conn = await mongoose.connect(config.mongodb.uri, {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,

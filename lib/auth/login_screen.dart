@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/widgets/sign_in_button.dart';
 import 'package:spotify_fy/widgets/social_button.dart';
@@ -172,6 +174,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ],
                 ),
+                if (kIsWeb) ...[
+                  const SizedBox(height: 16),
+                  TextButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse('https://merjohnpagente.github.io/spotify/SpotifyFY.apk'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    icon: const Icon(
+                      Icons.android,
+                      size: 18,
+                      color: SpotifyColors.textSecondary,
+                    ),
+                    label: const Text(
+                      'Download Android app (APK)',
+                      style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 13),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
