@@ -19,6 +19,20 @@ const STRATEGIES = [
 let preferredStrategy = null;
 const getPreferredStrategy = () => preferredStrategy;
 
+const strategyOptions = (strategy) => {
+  const options = {
+    dumpSingleJson: true,
+    noWarnings: true,
+    noCheckCertificate: true,
+    socketTimeout: 30,
+    skipDownload: true,
+    noPlaylist: true,
+    format: 'bestaudio/best',
+  };
+  if (strategy && strategy.extractorArgs) options.extractorArgs = strategy.extractorArgs;
+  return options;
+};
+
 const pickAudioUrl = (result) => {
   // yt-dlp puts the selected format's direct URL at the top level.
   if (result && result.url) return result.url;
@@ -35,7 +49,20 @@ const pickAudioUrl = (result) => {
   return any ? any.url : null;
 };
 
+// Test ONE strategy in isolation (used by the debug probe and by the chain).
+const extractWithStrategy = async (url, strategyLabel, timeoutMs = 25000) => {
+  const strategy =
+    STRATEGIES.find((s) => s.label === strategyLabel) || STRATEGIES[0];
+  const result = await runYtDlp(url, strategyOptions(strategy), timeoutMs);
+  const audioUrl = pickAudioUrl(result);
+  if (!audioUrl) throw new Error('No audio URL in yt-dlp output');
+  preferredStrategy = strategy.label;
+  return audioUrl;
+};
+
 const extractWithFallbacks = async (url) => {
+  // Hard deadline so the HTTP request always answers in bounded time.
+  const deadline = Date.now() + 90000;
   const order = preferredStrategy
     ? [
         ...STRATEGIES.filter((s) => s.label === preferredStrategy),
@@ -45,25 +72,10 @@ const extractWithFallbacks = async (url) => {
 
   let lastError = null;
   for (const strategy of order) {
-    const options = {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noCheckCertificate: true,
-      socketTimeout: 30,
-      skipDownload: true,
-      noPlaylist: true,
-      format: 'bestaudio/best',
-    };
-    if (strategy.extractorArgs) options.extractorArgs = strategy.extractorArgs;
-
+    if (Date.now() > deadline - 25000) break;
     try {
-      const result = await runYtDlp(url, options, 45000);
-      const audioUrl = pickAudioUrl(result);
-      if (audioUrl) {
-        preferredStrategy = strategy.label;
-        return audioUrl;
-      }
-      lastError = new Error('No audio URL in yt-dlp output');
+      const audioUrl = await extractWithStrategy(url, strategy.label);
+      return audioUrl;
     } catch (error) {
       lastError = error;
       console.warn(
@@ -141,7 +153,9 @@ const incrementAccessCount = async (videoId) => {
 module.exports = {
   extractAudioUrl,
   extractWithFallbacks,
+  extractWithStrategy,
   getPreferredStrategy,
+  STRATEGIES,
   getCachedAudioUrl,
   incrementAccessCount,
 };

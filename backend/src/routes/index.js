@@ -24,7 +24,12 @@ router.get('/status', (req, res) => {
 router.get('/debug/ytdlp', async (req, res, next) => {
   try {
     const { diagnose } = require('../services/youtubeService');
-    res.json(await diagnose(req.query.videoId));
+    res.json(
+      await diagnose({
+        videoId: req.query.videoId,
+        strategy: req.query.strategy,
+      })
+    );
   } catch (error) {
     next(error);
   }
