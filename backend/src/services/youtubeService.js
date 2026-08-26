@@ -76,36 +76,35 @@ const release = () => {
   }
 };
 
-const runWithRunner = (runner, url, options) => {
+const runWithRunner = (runner, url, options, timeoutMs = 90000) => {
   let timer;
   return Promise.race([
     runner(url, {
       dumpSingleJson: true,
       noWarnings: true,
-      noCallHome: true,
       noCheckCertificate: true,
       socketTimeout: 30,
       ...options,
     }),
     new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error('yt-dlp timed out')), 90000);
+      timer = setTimeout(() => reject(new Error('yt-dlp timed out')), timeoutMs);
     }),
   ]).finally(() => clearTimeout(timer));
 };
 
-const runYtDlp = async (url, options = {}) => {
+const runYtDlp = async (url, options = {}, timeoutMs = 90000) => {
   await acquire();
   try {
     const primary = await getRunner();
     try {
-      return await runWithRunner(primary.runner, url, options);
+      return await runWithRunner(primary.runner, url, options, timeoutMs);
     } catch (primaryError) {
       // If the configured binary misbehaves, retry once with the module's
       // own binary and stick with it while it keeps working.
       if (primary.label !== 'module') {
         console.warn(`yt-dlp: configured binary failed ("${primaryError.message}"), retrying with module binary`);
         const fallback = { runner: ytDlpModule, label: 'module' };
-        const result = await runWithRunner(fallback.runner, url, options);
+        const result = await runWithRunner(fallback.runner, url, options, timeoutMs);
         activeRunner = fallback;
         return result;
       }
@@ -117,8 +116,9 @@ const runYtDlp = async (url, options = {}) => {
 };
 
 // Deep diagnostic used by GET /api/debug/ytdlp - tells us exactly which
-// binary is in play and whether a minimal search works right now.
-const diagnose = async () => {
+// binary is in play, whether search works, and whether WATCH-page stream
+// extraction (the playback path) works right now.
+const diagnose = async (videoId = 'kJQP7kiw5Fk') => {
   const started = Date.now();
   const active = await getRunner();
   const out = {
@@ -126,6 +126,7 @@ const diagnose = async () => {
     configuredBinaryExists: customBinaryExists,
     usingBinary: active.label,
     search: null,
+    stream: null,
     durationMs: null,
   };
   try {
@@ -133,6 +134,20 @@ const diagnose = async () => {
     out.search = songs.length ? 'ok' : 'empty';
   } catch (error) {
     out.search = `failed: ${error.message}`;
+  }
+  if (videoId && VIDEO_ID_PATTERN.test(videoId)) {
+    try {
+      // Lazy require - audioService imports this module.
+      const { extractWithFallbacks, getPreferredStrategy } = require('./audioService');
+      const t0 = Date.now();
+      const audioUrl = await extractWithFallbacks(
+        `https://www.youtube.com/watch?v=${videoId}`
+      );
+      out.stream = audioUrl ? `ok (${Date.now() - t0}ms)` : 'empty';
+      out.streamStrategy = getPreferredStrategy();
+    } catch (error) {
+      out.stream = `failed: ${String(error.message).split('\n')[0].slice(0, 160)}`;
+    }
   }
   out.durationMs = Date.now() - started;
   return out;

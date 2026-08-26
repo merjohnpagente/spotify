@@ -5,13 +5,19 @@ const { runYtDlp } = require('./youtubeService');
 
 const AUDIO_CACHE_TTL = config.audio.cacheTtlHours * 60 * 60;
 
-// Strict selectors can match nothing on some videos ("Requested format is
-// not available") - degrade gracefully through progressively looser ones.
-const FORMAT_SELECTORS = [
-  'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
-  'bestaudio',
-  'bestaudio*/best',
+// YouTube blocks stream extraction differently per network: residential IPs
+// work with the default web client, datacenter IPs (Render etc.) often need
+// mobile clients. We probe strategies in order and REMEMBER the winner, so
+// after the first successful play the fast path is used immediately.
+const STRATEGIES = [
+  { label: 'default', extractorArgs: null },
+  { label: 'android', extractorArgs: 'youtube:player_client=android' },
+  { label: 'ios', extractorArgs: 'youtube:player_client=ios' },
+  { label: 'mweb', extractorArgs: 'youtube:player_client=mweb' },
 ];
+
+let preferredStrategy = null;
+const getPreferredStrategy = () => preferredStrategy;
 
 const pickAudioUrl = (result) => {
   // yt-dlp puts the selected format's direct URL at the top level.
@@ -30,24 +36,39 @@ const pickAudioUrl = (result) => {
 };
 
 const extractWithFallbacks = async (url) => {
+  const order = preferredStrategy
+    ? [
+        ...STRATEGIES.filter((s) => s.label === preferredStrategy),
+        ...STRATEGIES.filter((s) => s.label !== preferredStrategy),
+      ]
+    : STRATEGIES;
+
   let lastError = null;
-  for (const format of FORMAT_SELECTORS) {
+  for (const strategy of order) {
+    const options = {
+      dumpSingleJson: true,
+      noWarnings: true,
+      noCheckCertificate: true,
+      socketTimeout: 30,
+      skipDownload: true,
+      noPlaylist: true,
+      format: 'bestaudio/best',
+    };
+    if (strategy.extractorArgs) options.extractorArgs = strategy.extractorArgs;
+
     try {
-      const result = await runYtDlp(url, {
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCallHome: true,
-        noCheckCertificate: true,
-        skipDownload: true,
-        noPlaylist: true,
-        format,
-      });
+      const result = await runYtDlp(url, options, 45000);
       const audioUrl = pickAudioUrl(result);
-      if (audioUrl) return audioUrl;
-      lastError = new Error('No audio format found in yt-dlp output');
+      if (audioUrl) {
+        preferredStrategy = strategy.label;
+        return audioUrl;
+      }
+      lastError = new Error('No audio URL in yt-dlp output');
     } catch (error) {
       lastError = error;
-      console.warn(`yt-dlp format "${format}" failed: ${error.message}`);
+      console.warn(
+        `stream strategy "${strategy.label}" failed: ${String(error.message).split('\n')[0]}`
+      );
     }
   }
   throw lastError || new Error('Audio extraction failed');
@@ -119,6 +140,8 @@ const incrementAccessCount = async (videoId) => {
 
 module.exports = {
   extractAudioUrl,
+  extractWithFallbacks,
+  getPreferredStrategy,
   getCachedAudioUrl,
   incrementAccessCount,
 };
