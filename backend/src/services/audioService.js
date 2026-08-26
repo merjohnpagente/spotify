@@ -14,6 +14,8 @@ const STRATEGIES = [
   { label: 'android', extractorArgs: 'youtube:player_client=android' },
   { label: 'ios', extractorArgs: 'youtube:player_client=ios' },
   { label: 'mweb', extractorArgs: 'youtube:player_client=mweb' },
+  { label: 'tv_embedded', extractorArgs: 'youtube:player_client=tv_embedded' },
+  { label: 'web_embedded', extractorArgs: 'youtube:player_client=web_embedded' },
 ];
 
 let preferredStrategy = null;
