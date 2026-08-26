@@ -30,6 +30,16 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Friendly landing for anyone opening the API root in a browser.
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Spotify-FY API',
+    status: 'ok',
+    health: '/health',
+    endpoints: '/api',
+  });
+});
+
 app.use('/api', routes);
 
 app.use(notFoundHandler);
