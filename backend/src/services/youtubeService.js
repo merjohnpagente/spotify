@@ -1,4 +1,5 @@
-const ytDlp = require('yt-dlp-exec');
+const fs = require('fs');
+const ytDlpModule = require('yt-dlp-exec');
 const config = require('../config');
 const { cacheGet, cacheSet } = require('../config/redis');
 
@@ -9,7 +10,14 @@ const CACHE_TTL = {
   RECOMMENDATIONS: 24 * 60 * 60,
 };
 
-const YTDLP_BIN = config.youtube.ytDlpPath || 'yt-dlp';
+// Prefer an explicitly configured binary (YT_DLP_PATH) so deploys can ship
+// a fresh yt-dlp - YouTube extraction breaks quickly with stale versions.
+const configuredBinary = config.audio.ytDlpPath || config.youtube.ytDlpPath || '';
+const ytDlp =
+  configuredBinary && fs.existsSync(configuredBinary)
+    ? ytDlpModule.create(configuredBinary)
+    : ytDlpModule;
+const YTDLP_BIN = configuredBinary || 'yt-dlp';
 const TRENDING_PLAYLIST_URL = config.youtube.trendingPlaylistUrl;
 
 const VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
@@ -249,5 +257,6 @@ module.exports = {
   getTrendingSongs,
   getRecommendations,
   searchByGenre,
+  runYtDlp,
   YTDLP_BIN,
 };

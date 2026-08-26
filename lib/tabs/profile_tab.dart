@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/views/history_screen.dart';
 
@@ -238,7 +239,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.info_outline,
             title: 'Version',
             trailing: const Text(
-              '1.0.0',
+              '${AppVersion.version} (${AppVersion.buildNumber})',
               style: TextStyle(
                 color: SpotifyColors.textSecondary,
                 fontSize: 14,

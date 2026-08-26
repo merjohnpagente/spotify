@@ -1,9 +1,57 @@
-const ytDlp = require('yt-dlp-exec');
 const config = require('../config');
 const { Song } = require('../models');
 const { cacheGet, cacheSet } = require('../config/redis');
+const { runYtDlp } = require('./youtubeService');
 
 const AUDIO_CACHE_TTL = config.audio.cacheTtlHours * 60 * 60;
+
+// Strict selectors can match nothing on some videos ("Requested format is
+// not available") - degrade gracefully through progressively looser ones.
+const FORMAT_SELECTORS = [
+  'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
+  'bestaudio',
+  'bestaudio*/best',
+];
+
+const pickAudioUrl = (result) => {
+  // yt-dlp puts the selected format's direct URL at the top level.
+  if (result && result.url) return result.url;
+  const formats = Array.isArray(result && result.formats) ? result.formats : [];
+  const audioOnly = formats.filter(
+    (f) => f && f.url && f.acodec !== 'none' && f.vcodec === 'none'
+  );
+  if (audioOnly.length) {
+    // Pick the HIGHEST bitrate - yt-dlp lists formats roughly worst-first.
+    audioOnly.sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0));
+    return audioOnly[0].url;
+  }
+  const any = formats.find((f) => f && f.url);
+  return any ? any.url : null;
+};
+
+const extractWithFallbacks = async (url) => {
+  let lastError = null;
+  for (const format of FORMAT_SELECTORS) {
+    try {
+      const result = await runYtDlp(url, {
+        dumpSingleJson: true,
+        noWarnings: true,
+        noCallHome: true,
+        noCheckCertificate: true,
+        skipDownload: true,
+        noPlaylist: true,
+        format,
+      });
+      const audioUrl = pickAudioUrl(result);
+      if (audioUrl) return audioUrl;
+      lastError = new Error('No audio format found in yt-dlp output');
+    } catch (error) {
+      lastError = error;
+      console.warn(`yt-dlp format "${format}" failed: ${error.message}`);
+    }
+  }
+  throw lastError || new Error('Audio extraction failed');
+};
 
 const extractAudioUrl = async (videoId) => {
   const cacheKey = `audio:${videoId}`;
@@ -25,22 +73,7 @@ const extractAudioUrl = async (videoId) => {
 
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-
-    const result = await ytDlp(url, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noCallHome: true,
-      noCheckCertificate: true,
-      preferFreeFormats: true,
-      format: 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio',
-    });
-
-    const audioFormat = result.formats?.find(f => f.acodec !== 'none' && f.vcodec === 'none');
-    if (!audioFormat || !audioFormat.url) {
-      throw new Error('No audio format found');
-    }
-
-    const audioUrl = audioFormat.url;
+    const audioUrl = await extractWithFallbacks(url);
 
     // Persisting to MongoDB is best-effort too - never fail playback
     // because the DB write failed.
@@ -48,7 +81,7 @@ const extractAudioUrl = async (videoId) => {
       await Song.findOneAndUpdate(
         { videoId },
         { audioUrlCached: audioUrl, audioExtractedAt: new Date() },
-        { upsert: true, new: true }
+        { upsert: false }
       );
     } catch (dbError) {
       console.warn('MongoDB unavailable while caching audio URL:', dbError.message);
@@ -57,7 +90,10 @@ const extractAudioUrl = async (videoId) => {
     await cacheSet(cacheKey, { url: audioUrl }, AUDIO_CACHE_TTL);
     return audioUrl;
   } catch (error) {
-    console.error('Audio extraction error:', error);
+    console.error('Audio extraction error:', error.message);
+    if (error.stderr) {
+      console.error('yt-dlp stderr:', String(error.stderr).slice(0, 500));
+    }
     throw new Error('Failed to extract audio');
   }
 };

@@ -53,9 +53,12 @@ jobs:
         run: |
           if [ -f releases/SpotifyFY.apk ]; then
             cp releases/SpotifyFY.apk build/web/SpotifyFY.apk
-            echo '<a id="apk-link" href="SpotifyFY.apk"></a>' >> /dev/null
+            echo "APK included"
           else
             echo "No APK committed yet - skipping"
+          fi
+          if [ -f releases/version.json ]; then
+            cp releases/version.json build/web/version.json
           fi
 
       - name: Ensure .nojekyll

@@ -8,12 +8,16 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci
+    # Download the LATEST yt-dlp Linux binary at build time - YouTube
+    # extraction breaks quickly with stale yt-dlp versions.
+    buildCommand: npm ci && mkdir -p bin && (curl -fsSL -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux || echo "yt-dlp download failed, falling back to module binary") && chmod +x bin/yt-dlp 2>/dev/null || true
     startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: YT_DLP_PATH
+        value: /opt/render/project/src/backend/bin/yt-dlp
       - key: MONGODB_URI
         sync: false
       - key: JWT_ACCESS_SECRET

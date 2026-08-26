@@ -1,8 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:spotify_fy/providers/player_provider.dart';
+import 'package:spotify_fy/services/update_service.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/tabs/home_tab.dart';
 import 'package:spotify_fy/tabs/search_tab.dart';
 import 'package:spotify_fy/tabs/library_tab.dart';
@@ -39,6 +43,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
       begin: const Offset(0, 1),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _miniPlayerController, curve: Curves.easeOutCubic));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
   }
 
   @override
@@ -51,6 +56,57 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
     setState(() {
       _currentIndex = index;
     });
+  }
+
+  /// Prompts installed-app users when a newer APK is published.
+  /// Skipped on web - there, updating is just refreshing the page.
+  Future<void> _checkForUpdate() async {
+    if (kIsWeb) return;
+    final platform = defaultTargetPlatform;
+    if (platform != TargetPlatform.android && platform != TargetPlatform.iOS) {
+      return;
+    }
+    try {
+      final info = await UpdateService().checkForUpdate();
+      if (info == null || !mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: SpotifyColors.cardBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Update available',
+            style: TextStyle(color: SpotifyColors.textPrimary),
+          ),
+          content: Text(
+            'Version ${info.latestVersion} is available (you have ${AppVersion.version}).'
+            '${info.message == null ? '' : '\n\n${info.message}'}',
+            style: const TextStyle(color: SpotifyColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Later',
+                style: TextStyle(color: SpotifyColors.textSecondary),
+              ),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: SpotifyColors.primaryAccent,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                launchUrl(Uri.parse(info.apkUrl), mode: LaunchMode.externalApplication);
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      // Never block the app because the update check failed.
+    }
   }
 
   void _openFullPlayer() {

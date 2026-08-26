@@ -77,6 +77,7 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool auth = true,
     bool retried = false,
+    bool networkRetry = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
     final headers = _headers(auth: auth);
@@ -84,26 +85,23 @@ class ApiClient {
 
     http.Response response;
     try {
-      switch (method) {
-        case 'GET':
-          response = await _client.get(uri, headers: headers);
-        case 'POST':
-          response = await _client.post(uri, headers: headers, body: encodedBody);
-        case 'PATCH':
-          response = await _client.patch(uri, headers: headers, body: encodedBody);
-        case 'PUT':
-          response = await _client.put(uri, headers: headers, body: encodedBody);
-        case 'DELETE':
-          response = await _client.delete(uri, headers: headers, body: encodedBody);
-        default:
-          throw ArgumentError('Unsupported method: $method');
-      }
+      response = await _dispatch(method, uri, headers, encodedBody)
+          .timeout(const Duration(seconds: 60));
     } on TimeoutException {
-      throw const ApiException(0, 'Request timed out. Please try again.');
+      if (!networkRetry) {
+        // Free hosting (Render) sleeps when idle; the first call may take a
+        // while while the server wakes up. Retry once before giving up.
+        return _send(method, path,
+            body: body, auth: auth, retried: retried, networkRetry: true);
+      }
+      throw const ApiException(0,
+          'The server is taking too long to respond. Please try again in a moment.');
     } catch (e) {
-      // Network failures (SocketException & friends). Matched by message so
-      // this file also compiles for web, where dart:io is unavailable.
       if (_isNetworkError(e)) {
+        if (!networkRetry) {
+          return _send(method, path,
+              body: body, auth: auth, retried: retried, networkRetry: true);
+        }
         throw ApiException(0, 'Cannot reach server ($baseUrl). Is the backend running?');
       }
       rethrow;
@@ -117,6 +115,28 @@ class ApiClient {
     }
 
     return response;
+  }
+
+  Future<http.Response> _dispatch(
+    String method,
+    Uri uri,
+    Map<String, String> headers,
+    String? encodedBody,
+  ) {
+    switch (method) {
+      case 'GET':
+        return _client.get(uri, headers: headers);
+      case 'POST':
+        return _client.post(uri, headers: headers, body: encodedBody);
+      case 'PATCH':
+        return _client.patch(uri, headers: headers, body: encodedBody);
+      case 'PUT':
+        return _client.put(uri, headers: headers, body: encodedBody);
+      case 'DELETE':
+        return _client.delete(uri, headers: headers, body: encodedBody);
+      default:
+        throw ArgumentError('Unsupported method: $method');
+    }
   }
 
   Future<bool> _tryRefresh() async {

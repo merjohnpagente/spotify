@@ -234,9 +234,27 @@ class _SearchTabState extends ConsumerState<SearchTab> {
         child: CircularProgressIndicator(color: SpotifyColors.primaryAccent),
       ),
       error: (e, _) => Center(
-        child: Text(
-          'Search failed. Check your connection.',
-          style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                e.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => ref.invalidate(searchResultsProvider(_query)),
+                icon: const Icon(Icons.refresh, color: SpotifyColors.primaryAccent, size: 18),
+                label: const Text(
+                  'Retry',
+                  style: TextStyle(color: SpotifyColors.primaryAccent),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
