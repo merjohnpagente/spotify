@@ -4,17 +4,66 @@ import 'package:http/http.dart' as http;
 /// Chrome-only direct path via CORS proxy — mirrors PureTuber's
 /// youtubei call but bypasses Render cold start. Falls back to server proxy.
 class WebAudioService {
-  static const _corsProxy = 'https://corsproxy.io/?';
-  static const _playerUrl =
-      'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+  // Invidious instances (CORS-enabled, no key, GET) — much more reliable than corsproxy.io POST
+  static const _invidiousHosts = [
+    'https://inv.tux.pizza',
+    'https://yewtu.be',
+    'https://vid.puffyan.us',
+  ];
 
   Future<String?> getAudioUrl(String videoId, {Duration timeout = const Duration(seconds: 8)}) async {
-    // Try primary CORS proxy
-    var url = await _tryProxy('$_corsProxy$_playerUrl', videoId, timeout);
+    // Primary: Invidious via allorigins raw (bypasses CORS, no API key needed)
+    var url = await _tryInvidiousViaAllOrigins(videoId, timeout);
     if (url != null) return url;
-    // Fallback proxy (if corsproxy.io rate-limits)
-    url = await _tryProxy('https://api.allorigins.win/raw?url=${Uri.encodeComponent(_playerUrl)}', videoId, timeout);
-    return url;
+    // Direct Invidious (if browser allows CORS — some instances set Access-Control-Allow-Origin:*)
+    url = await _tryDirectInvidious(videoId, timeout);
+    if (url != null) return url;
+    return null;
+  }
+
+  Future<String?> _tryInvidiousViaAllOrigins(String videoId, Duration timeout) async {
+    for (final host in _invidiousHosts) {
+      try {
+        final invUrl = '$host/api/v1/videos/$videoId';
+        final proxyUrl = 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(invUrl)}';
+        final resp = await http.get(Uri.parse(proxyUrl)).timeout(timeout);
+        if (resp.statusCode != 200) continue;
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final url = _pickInvidiousUrl(data);
+        if (url != null) return url;
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _tryDirectInvidious(String videoId, Duration timeout) async {
+    for (final host in _invidiousHosts) {
+      try {
+        final resp = await http.get(Uri.parse('$host/api/v1/videos/$videoId')).timeout(timeout);
+        if (resp.statusCode != 200) continue;
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final url = _pickInvidiousUrl(data);
+        if (url != null) return url;
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  String? _pickInvidiousUrl(Map<String, dynamic> data) {
+    final List adaptive = (data['adaptiveFormats'] as List?) ?? [];
+    final audio = adaptive.where((f) {
+      final m = (f as Map)['type']?.toString() ?? '';
+      final u = f['url'] as String?;
+      return u != null && m.contains('audio');
+    }).toList();
+    final pick = audio.isNotEmpty ? audio : adaptive;
+    if (pick.isEmpty) return null;
+    pick.sort((a, b) => ((b as Map)['bitrate'] as int? ?? 0).compareTo((a as Map)['bitrate'] as int? ?? 0));
+    return (pick.first as Map)['url'] as String?;
   }
 
   Future<String?> _tryProxy(String proxyUrl, String videoId, Duration timeout) async {

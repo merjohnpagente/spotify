@@ -89,6 +89,29 @@ const extractWithFallbacks = async (url) => {
   throw lastError || new Error('Audio extraction failed');
 };
 
+const fetchViaInvidious = async (videoId) => {
+  const hosts = ['https://inv.tux.pizza', 'https://yewtu.be', 'https://vid.puffyan.us'];
+  for (const host of hosts) {
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 8000);
+      const resp = await fetch(`${host}/api/v1/videos/${videoId}`, { signal: controller.signal });
+      clearTimeout(t);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const adaptive = data.adaptiveFormats || [];
+      const audio = adaptive.filter((f) => f.type && f.type.includes('audio') && f.url);
+      const pick = audio.length ? audio : adaptive;
+      if (!pick.length) continue;
+      pick.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+      if (pick[0].url) return pick[0].url;
+    } catch (_) {
+      continue;
+    }
+  }
+  return null;
+};
+
 const extractAudioUrl = async (videoId) => {
   const cacheKey = `audio:${videoId}`;
   const cached = await cacheGet(cacheKey);
@@ -111,7 +134,15 @@ const extractAudioUrl = async (videoId) => {
 
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const audioUrl = await extractWithFallbacks(url);
+    let audioUrl;
+    try {
+      audioUrl = await extractWithFallbacks(url);
+    } catch (ytError) {
+      console.warn(`yt-dlp failed for ${videoId}, trying Invidious fallback: ${ytError.message}`);
+      audioUrl = await fetchViaInvidious(videoId);
+      if (!audioUrl) throw ytError;
+      preferredStrategy = 'invidious';
+    }
 
     // Persisting to MongoDB is best-effort too - never fail playback
     // because the DB write failed.
