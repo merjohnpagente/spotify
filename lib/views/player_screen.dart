@@ -237,14 +237,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                           ),
                         ],
                       ),
-                      if (player.loading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: LinearProgressIndicator(
-                            color: SpotifyColors.primaryAccent,
-                            backgroundColor: SpotifyColors.cardBackground,
-                          ),
-                        ),
+
                       if (player.error != null)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -386,7 +379,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   Widget _buildPlayPauseButton(PlayerState player, PlayerController controller) {
     return GestureDetector(
-      onTap: player.currentSong == null ? null : controller.togglePlayPause,
+      onTap: player.loading || player.currentSong == null ? null : controller.togglePlayPause,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: 64,
@@ -402,11 +395,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             ),
           ],
         ),
-        child: Icon(
-          player.isPlaying ? Icons.pause : Icons.play_arrow,
-          color: SpotifyColors.textPrimary,
-          size: 28,
-        ),
+        child: player.loading
+            ? const Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: SpotifyColors.textPrimary,
+                ),
+              )
+            : Icon(
+                player.isPlaying ? Icons.pause : Icons.play_arrow,
+                color: SpotifyColors.textPrimary,
+                size: 28,
+              ),
       ),
     );
   }
