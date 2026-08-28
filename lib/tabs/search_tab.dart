@@ -202,6 +202,8 @@ class _SearchTabState extends ConsumerState<SearchTab> {
     final results = ref.watch(searchResultsProvider(_query));
 
     return results.when(
+      skipLoadingOnRefresh: true,
+      skipLoadingOnReload: false,
       data: (songs) => songs.isEmpty
           ? ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24),

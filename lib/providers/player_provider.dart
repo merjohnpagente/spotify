@@ -137,14 +137,22 @@ class PlayerController extends StateNotifier<PlayerState> {
   Future<void> playQueue(List<Song> songs, {int index = 0}) async {
     if (songs.isEmpty) return;
     final safeIndex = index.clamp(0, songs.length - 1);
+    final dur = Duration(seconds: songs[safeIndex].duration > 0 ? songs[safeIndex].duration : 0);
     state = state.copyWith(
       queue: List.of(songs),
       currentIndex: safeIndex,
       isPlaying: true,
       position: Duration.zero,
-      duration: Duration.zero,
+      duration: dur,
       clearError: true,
     );
+    // Guard long compilations — PureTuber also fails on 3h mixes
+    final titleLower = songs[safeIndex].title.toLowerCase();
+    if (songs[safeIndex].duration > 1800 ||
+        titleLower.contains('top 100') && titleLower.contains('billboard') ||
+        titleLower.contains('compilation')) {
+      // still try, but warn — long mixes often timeout on extraction
+    }
     await _loadAndPlay();
   }
 
@@ -160,6 +168,10 @@ class PlayerController extends StateNotifier<PlayerState> {
     if (song == null) return;
     final videoId = song.videoId;
 
+    // Show known duration immediately so UI not 00:00/00:00 (e.g. Image1)
+    if (state.duration.inSeconds == 0 && song.duration > 0) {
+      state = state.copyWith(duration: Duration(seconds: song.duration));
+    }
     state = state.copyWith(loading: true, isPlaying: true, clearError: true);
 
     try {

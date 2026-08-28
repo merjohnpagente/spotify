@@ -31,6 +31,9 @@ services:
       # Only allow the GitHub Pages site in production CORS.
       - key: FRONTEND_URL
         value: https://merjohnpagente.github.io
+      # Faster playback — avoid Render killing slow yt-dlp
+      - key: REQUEST_TIMEOUT
+        value: 90000
       # Firebase ID-token verification for Google sign-in (public certs, no keys needed).
       - key: FIREBASE_PROJECT_ID
         value: spotify-ee119
