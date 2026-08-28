@@ -1,7 +1,18 @@
+const mongoose = require('mongoose');
 const { Song, UserLike, UserHistory, User } = require('../models');
 const { searchSongs, getTrendingSongs, getSongById, getRecommendations, searchByGenre } = require('./youtubeService');
 const { extractAudioUrl, incrementAccessCount } = require('./audioService');
 const { cacheGet, cacheSet, cacheDeletePattern } = require('../config/redis');
+
+const isDbReady = () => mongoose.connection.readyState === 1;
+const ensureDb = () => {
+  if (!isDbReady()) {
+    const err = new Error('Database unavailable - please configure MongoDB Atlas IP whitelist');
+    err.status = 503;
+    err.statusCode = 503;
+    throw err;
+  }
+};
 
 const CACHE_TTL = {
   SONG: 7 * 24 * 60 * 60,
@@ -13,6 +24,14 @@ const CACHE_TTL = {
 // Persist a YouTube song in MongoDB; if the DB is unavailable, degrade
 // gracefully and serve the YouTube data directly so music keeps playing.
 const upsertSong = async (ytData) => {
+  if (!isDbReady()) {
+    return {
+      id: null,
+      isAvailable: true,
+      addedToSystemAt: new Date(),
+      ...ytData,
+    };
+  }
   try {
     let song = await Song.findOne({ videoId: ytData.videoId });
     if (!song) {
@@ -31,6 +50,20 @@ const upsertSong = async (ytData) => {
 };
 
 const getOrCreateSong = async (videoId) => {
+  if (!isDbReady()) {
+    const youtubeData = await getSongById(videoId);
+    if (!youtubeData) throw new Error('Song not found on YouTube');
+    // Return a mock with toPublicJSON so callers keep working without DB
+    return {
+      toPublicJSON: () => ({
+        id: null,
+        isAvailable: true,
+        addedToSystemAt: new Date(),
+        ...youtubeData,
+      }),
+      videoId,
+    };
+  }
   let song = await Song.findOne({ videoId });
   
   if (!song) {
@@ -141,6 +174,7 @@ const getSongsByGenre = async (genre, limit = 20) => {
 };
 
 const likeSong = async (userId, videoId) => {
+  ensureDb();
   await getOrCreateSong(videoId);
   
   const existing = await UserLike.findOne({ userId, videoId });
@@ -155,6 +189,7 @@ const likeSong = async (userId, videoId) => {
 };
 
 const unlikeSong = async (userId, videoId) => {
+  ensureDb();
   const result = await UserLike.deleteOne({ userId, videoId });
   if (result.deletedCount === 0) throw new Error('Not liked');
 
@@ -165,6 +200,7 @@ const unlikeSong = async (userId, videoId) => {
 };
 
 const getLikedSongs = async (userId, limit = 50) => {
+  ensureDb();
   const cacheKey = `user:${userId}:liked:${limit}`;
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
@@ -183,6 +219,7 @@ const getLikedSongs = async (userId, limit = 50) => {
 };
 
 const addToHistory = async (userId, videoId, playDuration, totalDuration) => {
+  ensureDb();
   await getOrCreateSong(videoId);
   
   const completed = playDuration >= totalDuration * 0.9;
@@ -206,6 +243,7 @@ const addToHistory = async (userId, videoId, playDuration, totalDuration) => {
 };
 
 const getHistory = async (userId, limit = 50) => {
+  ensureDb();
   const cacheKey = `user:${userId}:history:${limit}`;
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
@@ -228,11 +266,13 @@ const getHistory = async (userId, limit = 50) => {
 };
 
 const clearHistory = async (userId) => {
+  ensureDb();
   await UserHistory.deleteMany({ userId });
   await cacheDeletePattern(`user:${userId}:history*`);
 };
 
 const getUserStats = async (userId) => {
+  ensureDb();
   const cacheKey = `user:${userId}:stats`;
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;

@@ -1,4 +1,6 @@
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { execFile } = require('child_process');
 const config = require('../config');
 const { cacheGet, cacheSet } = require('../config/redis');
@@ -8,6 +10,32 @@ const CACHE_TTL = {
   VIDEO: 7 * 24 * 60 * 60,
   TRENDING: 60 * 60,
   RECOMMENDATIONS: 24 * 60 * 60,
+};
+
+// YouTube bot-blocks datacenter IPs (Render etc.) for stream extraction.
+// Passing browser cookies (YOUTUBE_COOKIES env var, Netscape format) lifts
+// the block. Written to a temp file once at boot; never logged.
+let cookieFilePath = null;
+if (process.env.YOUTUBE_COOKIES) {
+  try {
+    cookieFilePath = path.join(os.tmpdir(), 'yt-dlp-cookies.txt');
+    fs.writeFileSync(cookieFilePath, process.env.YOUTUBE_COOKIES.replace(/\\n/g, '\n'));
+    console.log('yt-dlp: YOUTUBE_COOKIES configured, bot-check bypass available');
+  } catch (error) {
+    console.warn('yt-dlp: failed to write cookies file:', error.message);
+    cookieFilePath = null;
+  }
+}
+
+const baseYtDlpOptions = () => {
+  const options = {
+    dumpSingleJson: true,
+    noWarnings: true,
+    noCheckCertificate: true,
+    socketTimeout: 30,
+  };
+  if (cookieFilePath) options.cookies = cookieFilePath;
+  return options;
 };
 
 // Prefer an explicitly configured binary (YT_DLP_PATH) so deploys can ship
@@ -84,7 +112,7 @@ const parseOutput = ({ stdout }) =>
 // leaking zombies that clog the CPU.
 const runWithRunner = (runner, url, options, timeoutMs = 90000) => {
   let timer;
-  const execPromise = runner.exec(url, options, {});
+  const execPromise = runner.exec(url, { ...baseYtDlpOptions(), ...options }, {});
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => {
       try {
@@ -199,13 +227,18 @@ const searchSongs = async (query, limit = 20) => {
       .filter((s) => s && s.videoId && VIDEO_ID_PATTERN.test(s.videoId))
       .slice(0, limit);
 
-    if (!songs.length) throw new Error('No results found');
+    if (!songs.length) {
+      console.warn(`yt-dlp search returned no results for "${query}"`);
+      await cacheSet(cacheKey, [], CACHE_TTL.SEARCH);
+      return [];
+    }
 
     await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
     return songs;
   } catch (error) {
     console.error('yt-dlp search error:', error.message);
-    throw new Error('Search failed');
+    // Return empty instead of 500 so UI can show "No results" instead of error
+    return [];
   }
 };
 

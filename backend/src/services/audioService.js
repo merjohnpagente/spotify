@@ -1,7 +1,10 @@
+const mongoose = require('mongoose');
 const config = require('../config');
 const { Song } = require('../models');
 const { cacheGet, cacheSet } = require('../config/redis');
 const { runYtDlp } = require('./youtubeService');
+
+const isDbReady = () => mongoose.connection.readyState === 1;
 
 const AUDIO_CACHE_TTL = config.audio.cacheTtlHours * 60 * 60;
 
@@ -23,10 +26,6 @@ const getPreferredStrategy = () => preferredStrategy;
 
 const strategyOptions = (strategy) => {
   const options = {
-    dumpSingleJson: true,
-    noWarnings: true,
-    noCheckCertificate: true,
-    socketTimeout: 30,
     skipDownload: true,
     noPlaylist: true,
     format: 'bestaudio/best',
@@ -96,14 +95,16 @@ const extractAudioUrl = async (videoId) => {
   // MongoDB read is best-effort: if the DB is unavailable we still
   // want to serve audio straight from YouTube.
   let song = null;
-  try {
-    song = await Song.findOne({ videoId });
-  } catch (dbError) {
-    console.warn('MongoDB unavailable while reading audio cache:', dbError.message);
-  }
-  if (song && song.isAudioCacheValid()) {
-    await cacheSet(cacheKey, { url: song.audioUrlCached }, AUDIO_CACHE_TTL);
-    return song.audioUrlCached;
+  if (isDbReady()) {
+    try {
+      song = await Song.findOne({ videoId });
+    } catch (dbError) {
+      console.warn('MongoDB unavailable while reading audio cache:', dbError.message);
+    }
+    if (song && song.isAudioCacheValid()) {
+      await cacheSet(cacheKey, { url: song.audioUrlCached }, AUDIO_CACHE_TTL);
+      return song.audioUrlCached;
+    }
   }
 
   try {
@@ -112,14 +113,16 @@ const extractAudioUrl = async (videoId) => {
 
     // Persisting to MongoDB is best-effort too - never fail playback
     // because the DB write failed.
-    try {
-      await Song.findOneAndUpdate(
-        { videoId },
-        { audioUrlCached: audioUrl, audioExtractedAt: new Date() },
-        { upsert: false }
-      );
-    } catch (dbError) {
-      console.warn('MongoDB unavailable while caching audio URL:', dbError.message);
+    if (isDbReady()) {
+      try {
+        await Song.findOneAndUpdate(
+          { videoId },
+          { audioUrlCached: audioUrl, audioExtractedAt: new Date() },
+          { upsert: false }
+        );
+      } catch (dbError) {
+        console.warn('MongoDB unavailable while caching audio URL:', dbError.message);
+      }
     }
 
     await cacheSet(cacheKey, { url: audioUrl }, AUDIO_CACHE_TTL);
@@ -134,6 +137,7 @@ const extractAudioUrl = async (videoId) => {
 };
 
 const getCachedAudioUrl = async (videoId) => {
+  if (!isDbReady()) return null;
   const song = await Song.findOne({ videoId });
   if (song && song.isAudioCacheValid()) {
     return song.audioUrlCached;
@@ -142,6 +146,7 @@ const getCachedAudioUrl = async (videoId) => {
 };
 
 const incrementAccessCount = async (videoId) => {
+  if (!isDbReady()) return;
   try {
     await Song.findOneAndUpdate(
       { videoId },

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:spotify_fy/providers/player_provider.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/views/queue_screen.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -316,7 +317,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                           _buildBottomActionButton(Icons.devices, 'Devices'),
                           _buildBottomActionButton(Icons.share, 'Share'),
                           _buildBottomActionButton(Icons.lyrics, 'Lyrics'),
-                          _buildBottomActionButton(Icons.queue_music, 'Queue'),
+                          _buildBottomActionButton(
+                            Icons.queue_music,
+                            'Queue',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const QueueScreen()),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 100),
@@ -398,18 +406,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
   }
 
-  Widget _buildBottomActionButton(IconData icon, String label) {
-    return Column(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: SpotifyColors.cardBackground,
-            shape: BoxShape.circle,
+  Widget _buildBottomActionButton(IconData icon, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: SpotifyColors.cardBackground,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: SpotifyColors.textPrimary, size: 24),
           ),
-          child: Icon(icon, color: SpotifyColors.textPrimary, size: 24),
-        ),
         const SizedBox(height: 4),
         Text(
           label,
@@ -419,6 +429,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           ),
         ),
       ],
+      ),
     );
   }
 }

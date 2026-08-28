@@ -7,6 +7,7 @@ import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
+import 'package:spotify_fy/views/artist_screen.dart';
 import 'package:spotify_fy/views/genre_songs_screen.dart';
 import 'package:spotify_fy/widgets/genre_card.dart';
 import 'package:spotify_fy/widgets/search_result_card.dart';
@@ -59,6 +60,7 @@ class _SearchTabState extends ConsumerState<SearchTab> {
   }
 
   bool _isSearching = false;
+  String _searchTab = 'songs';
 
   @override
   void dispose() {
@@ -209,25 +211,31 @@ class _SearchTabState extends ConsumerState<SearchTab> {
                   style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
                 ),
               ],
-            )          : ListView(
+            )
+          : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               children: [
-                const Text(
-                  'Top Results',
-                  style: TextStyle(
-                    color: SpotifyColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                _buildResultTabs(),
+                const SizedBox(height: 8),
+                if (_searchTab == 'songs') ...[
+                  const Text(
+                    'Top Results',
+                    style: TextStyle(
+                      color: SpotifyColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                ...songs.asMap().entries.map((entry) => SearchResultCard(
-                      title: entry.value.title,
-                      artist: entry.value.artist,
-                      imageUrl: entry.value.thumbnailUrl,
-                      onPlay: () => _playSong(context, songs, entry.key),
-                      onTap: () => _playSong(context, songs, entry.key),
-                    )),
+                  const SizedBox(height: 16),
+                  ...songs.asMap().entries.map((entry) => SearchResultCard(
+                        title: entry.value.title,
+                        artist: entry.value.artist,
+                        imageUrl: entry.value.thumbnailUrl,
+                        onPlay: () => _playSong(context, songs, entry.key),
+                        onTap: () => _playSong(context, songs, entry.key),
+                      )),
+                ] else
+                  _buildArtistsList(songs),
               ],
             ),
       loading: () => const Center(
@@ -255,6 +263,180 @@ class _SearchTabState extends ConsumerState<SearchTab> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultTabs() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: SpotifyColors.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _TabButton(
+              label: 'Songs',
+              active: _searchTab == 'songs',
+              onTap: () => setState(() => _searchTab = 'songs'),
+            ),
+          ),
+          Expanded(
+            child: _TabButton(
+              label: 'Artists',
+              active: _searchTab == 'artists',
+              onTap: () => setState(() => _searchTab = 'artists'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArtistsList(List<Song> songs) {
+    final seen = <String>{};
+    final artists = <Song>[];
+    for (final s in songs) {
+      final key = s.artist.toLowerCase();
+      if (key.isNotEmpty && !seen.contains(key)) {
+        seen.add(key);
+        artists.add(s);
+      }
+    }
+    if (artists.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Text(
+          'No artists found',
+          style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Artists',
+          style: TextStyle(
+            color: SpotifyColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...artists.map((s) => _ArtistListTile(
+              name: s.artist,
+              imageUrl: s.thumbnailUrl,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ArtistScreen(artist: s.artist)),
+              ),
+            )),
+      ],
+    );
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _TabButton({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.all(4),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? SpotifyColors.primaryAccent : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: active ? SpotifyColors.textPrimary : SpotifyColors.textSecondary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArtistListTile extends StatelessWidget {
+  final String name;
+  final String imageUrl;
+  final VoidCallback onTap;
+
+  const _ArtistListTile({
+    required this.name,
+    required this.imageUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            ClipOval(
+              child: Image.network(
+                imageUrl,
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 56,
+                  height: 56,
+                  color: SpotifyColors.cardBackground,
+                  child: const Icon(Icons.person, color: SpotifyColors.textSecondary, size: 28),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: SpotifyColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Artist',
+                    style: TextStyle(
+                      color: SpotifyColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
+          ],
         ),
       ),
     );

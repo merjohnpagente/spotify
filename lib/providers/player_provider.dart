@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:spotify_fy/models/song.dart';
@@ -147,12 +148,15 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   Future<void> playSong(Song song, {List<Song>? queue}) async {
     final list = queue ?? [song];
-    await playQueue(list, index: list.indexWhere((s) => s.videoId == song.videoId).clamp(0, 0));
+    final rawIndex = list.indexWhere((s) => s.videoId == song.videoId);
+    final safeIndex = rawIndex < 0 ? 0 : rawIndex.clamp(0, list.length - 1);
+    await playQueue(list, index: safeIndex);
   }
 
   Future<void> _loadAndPlay() async {
     final song = state.currentSong;
     if (song == null) return;
+    final videoId = song.videoId;
 
     state = state.copyWith(loading: true, isPlaying: true, clearError: true);
 
@@ -161,7 +165,19 @@ class PlayerController extends StateNotifier<PlayerState> {
           .read(authProvider)
           .user
           ?.preferences['audioQuality'] as String?;
-      final url = await _music.getStreamUrl(song.videoId, quality: quality);
+      // On Web the direct googlevideo URL is blocked by CORS, so prefer
+      // the backend proxy which pipes bytes with CORS headers.
+      String url;
+      if (kIsWeb) {
+        url = _music.getAudioProxyUrl(videoId, quality: quality);
+      } else {
+        try {
+          url = await _music.getStreamUrl(videoId, quality: quality);
+        } catch (_) {
+          // Fallback to proxy if direct extraction fails
+          url = _music.getAudioProxyUrl(videoId, quality: quality);
+        }
+      }
       await _player.stop();
       await _player.setSource(UrlSource(url));
       await _player.setVolume(state.volume);
@@ -169,20 +185,62 @@ class PlayerController extends StateNotifier<PlayerState> {
       state = state.copyWith(
         loading: false,
         isPlaying: true,
-        isLiked: _likedIds.contains(song.videoId),
+        isLiked: _likedIds.contains(videoId),
         likedLoaded: true,
       );
     } on ApiException catch (e) {
+      // On web, if direct stream failed, retry via proxy once
+      if (kIsWeb && !e.message.toLowerCase().contains('proxy')) {
+        try {
+          final quality = _ref
+              .read(authProvider)
+              .user
+              ?.preferences['audioQuality'] as String?;
+          final proxyUrl = _music.getAudioProxyUrl(videoId, quality: quality);
+          await _player.stop();
+          await _player.setSource(UrlSource(proxyUrl));
+          await _player.setVolume(state.volume);
+          await _player.resume();
+          state = state.copyWith(
+            loading: false,
+            isPlaying: true,
+            isLiked: _likedIds.contains(videoId),
+            likedLoaded: true,
+          );
+          return;
+        } catch (_) {}
+      }
       state = state.copyWith(
         loading: false,
         isPlaying: false,
         error: e.message,
       );
-    } catch (_) {
+    } catch (e) {
+      // Last resort: try proxy URL on web
+      if (kIsWeb) {
+        try {
+          final quality = _ref
+              .read(authProvider)
+              .user
+              ?.preferences['audioQuality'] as String?;
+          final proxyUrl = _music.getAudioProxyUrl(videoId, quality: quality);
+          await _player.stop();
+          await _player.setSource(UrlSource(proxyUrl));
+          await _player.setVolume(state.volume);
+          await _player.resume();
+          state = state.copyWith(
+            loading: false,
+            isPlaying: true,
+            isLiked: _likedIds.contains(videoId),
+            likedLoaded: true,
+          );
+          return;
+        } catch (_) {}
+      }
       state = state.copyWith(
         loading: false,
         isPlaying: false,
-        error: 'Could not play this song',
+        error: 'Could not play this song: $e',
       );
     }
   }
@@ -238,6 +296,55 @@ class PlayerController extends StateNotifier<PlayerState> {
     if (index < 0) return;
     state = state.copyWith(currentIndex: index, position: Duration.zero);
     await _loadAndPlay();
+  }
+
+  /// Jump to a specific queue position (used by the queue screen).
+  Future<void> playAt(int index) async {
+    if (index < 0 || index >= state.queue.length) return;
+    if (index == state.currentIndex) {
+      await togglePlayPause();
+      return;
+    }
+    state = state.copyWith(currentIndex: index, position: Duration.zero);
+    await _loadAndPlay();
+  }
+
+  /// Remove a track from the queue, keeping the playing position correct.
+  void removeFromQueue(int index) {
+    if (index < 0 || index >= state.queue.length) return;
+    final queue = List<Song>.from(state.queue);
+    queue.removeAt(index);
+    var currentIndex = state.currentIndex;
+    if (index < currentIndex) {
+      currentIndex -= 1;
+    } else if (index == currentIndex) {
+      // Removing the currently playing song: stop it and advance if possible.
+      currentIndex = currentIndex >= queue.length ? queue.length - 1 : currentIndex;
+    }
+    state = state.copyWith(queue: queue, currentIndex: queue.isEmpty ? -1 : currentIndex);
+  }
+
+  /// Reorder a queue item (drag handle in the queue screen).
+  void moveQueueItem(int from, int to) {
+    if (from < 0 || from >= state.queue.length) return;
+    if (to < 0 || to >= state.queue.length) return;
+    final queue = List<Song>.from(state.queue);
+    final moved = queue.removeAt(from);
+    queue.insert(to, moved);
+    var currentIndex = state.currentIndex;
+    if (from == currentIndex) {
+      currentIndex = to;
+    } else if (from < currentIndex && to >= currentIndex) {
+      currentIndex -= 1;
+    } else if (from > currentIndex && to <= currentIndex) {
+      currentIndex += 1;
+    }
+    state = state.copyWith(queue: queue, currentIndex: currentIndex);
+  }
+
+  void clearQueue() {
+    state = state.copyWith(queue: const [], currentIndex: -1, isPlaying: false);
+    _player.stop();
   }
 
   int _nextIndex() {

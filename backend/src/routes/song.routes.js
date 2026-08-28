@@ -23,6 +23,7 @@ router.get('/me/stats', authenticate, songController.getStats);
 
 router.get('/:videoId/recommendations', videoIdValidation, songController.recommendations);
 router.get('/:videoId/stream', videoIdValidation, qualityValidation, songController.stream);
+router.get('/:videoId/audio', videoIdValidation, qualityValidation, songController.audioProxy);
 router.get('/:videoId', videoIdValidation, songController.getById);
 
 router.post('/:videoId/like', authenticate, videoIdValidation, songController.like);

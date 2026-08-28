@@ -103,7 +103,6 @@ const historyIdValidation = [
 ];
 
 const historyValidation = [
-  body('videoId').matches(/^[a-zA-Z0-9_-]{11}$/).withMessage('Valid YouTube video ID required'),
   body('playDuration').isInt({ min: 0 }).withMessage('Play duration must be positive integer'),
   body('totalDuration').isInt({ min: 1 }).withMessage('Total duration required'),
   validate,

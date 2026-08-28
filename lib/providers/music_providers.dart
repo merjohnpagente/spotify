@@ -47,3 +47,7 @@ final listeningHistoryProvider = FutureProvider.autoDispose<List<Song>>((ref) as
   final entries = await ref.watch(musicServiceProvider).history(limit: 50);
   return entries.map(Song.fromJson).toList();
 });
+
+final userStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+  return ref.watch(musicServiceProvider).stats();
+});

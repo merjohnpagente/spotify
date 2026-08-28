@@ -40,6 +40,16 @@ class MusicService {
     return (data as Map<String, dynamic>)['streamUrl'] as String;
   }
 
+  /// Proxy URL served by our backend — use on Web to avoid CORS blocks on
+  /// googlevideo.com. The backend pipes bytes with proper CORS headers.
+  String getAudioProxyUrl(String videoId, {String? quality}) {
+    final base = _api.baseUrl;
+    final q = quality == null || quality.isEmpty
+        ? ''
+        : '?quality=${Uri.encodeQueryComponent(quality)}';
+    return '$base/api/songs/$videoId/audio$q';
+  }
+
   Future<List<Song>> recommendations(String videoId, {int limit = 10}) async {
     final data = await _api.get('/api/songs/$videoId/recommendations?limit=$limit', auth: false);
     return _songList(data);

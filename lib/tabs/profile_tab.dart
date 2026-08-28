@@ -4,6 +4,8 @@ import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/views/history_screen.dart';
+import 'package:spotify_fy/views/settings_screen.dart';
+import 'package:spotify_fy/views/stats_screen.dart';
 
 class ProfileTab extends ConsumerStatefulWidget {
   const ProfileTab({super.key});
@@ -222,6 +224,28 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const HistoryScreen()),
+              );
+            },
+          ),
+          _buildSettingTile(
+            icon: Icons.insights_outlined,
+            title: 'Listening Stats',
+            trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StatsScreen()),
+              );
+            },
+          ),
+          _buildSettingTile(
+            icon: Icons.settings_outlined,
+            title: 'Settings',
+            trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
               );
             },
           ),
