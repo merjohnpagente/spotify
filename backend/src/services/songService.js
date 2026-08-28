@@ -86,10 +86,9 @@ const searchSongsService = async (query, limit = 20) => {
 
   const youtubeResults = await searchSongs(query, limit);
   
-  const songs = [];
-  for (const ytSong of youtubeResults) {
-    songs.push(await upsertSong(ytSong));
-  }
+  // Fast path: when DB is warming or unavailable, upsert is instant via isDbReady()
+  // Parallelize DB writes so 30 songs don't take 30× latency.
+  const songs = await Promise.all(youtubeResults.map(yt => upsertSong(yt)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;
@@ -102,10 +101,7 @@ const getTrendingSongsService = async (limit = 30) => {
 
   const youtubeResults = await getTrendingSongs(limit);
   
-  const songs = [];
-  for (const ytSong of youtubeResults) {
-    songs.push(await upsertSong(ytSong));
-  }
+  const songs = await Promise.all(youtubeResults.map(yt => upsertSong(yt)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.TRENDING);
   return songs;
@@ -148,10 +144,7 @@ const getRecommendationsService = async (videoId, limit = 10) => {
 
   const recommendations = await getRecommendations(videoId, limit);
   
-  const songs = [];
-  for (const rec of recommendations) {
-    songs.push(await upsertSong(rec));
-  }
+  const songs = await Promise.all(recommendations.map(r => upsertSong(r)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.RECOMMENDATIONS);
   return songs;
@@ -164,10 +157,7 @@ const getSongsByGenre = async (genre, limit = 20) => {
 
   const youtubeResults = await searchByGenre(genre, limit);
   
-  const songs = [];
-  for (const ytSong of youtubeResults) {
-    songs.push(await upsertSong(ytSong));
-  }
+  const songs = await Promise.all(youtubeResults.map(yt => upsertSong(yt)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;

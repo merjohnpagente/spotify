@@ -47,51 +47,67 @@ const disconnectRedis = async () => {
   }
 };
 
-const cacheGet = async (key) => {
-  if (!redisClient) return null;
-  try {
-    const data = await redisClient.get(key);
-    return data ? JSON.parse(data) : null;
-  } catch (error) {
-    console.error('Cache get error:', error);
-    return null;
+// In-memory fallback when REDIS_URL not set (Render free) — same API, zero infra.
+const memCache = new Map(); // key -> {v, exp}
+const memGet = (key) => {
+  const e = memCache.get(key);
+  if (!e) return null;
+  if (Date.now() > e.exp) { memCache.delete(key); return null; }
+  return e.v;
+};
+const memSet = (key, v, ttl) => {
+  if (memCache.size > 500) { // cap
+    const first = memCache.keys().next().value;
+    if (first) memCache.delete(first);
   }
+  memCache.set(key, { v, exp: Date.now() + ttl * 1000 });
+};
+
+const cacheGet = async (key) => {
+  if (redisClient) {
+    try {
+      const data = await redisClient.get(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Cache get error:', error);
+    }
+  }
+  return memGet(key);
 };
 
 const cacheSet = async (key, value, ttlSeconds) => {
-  if (!redisClient) return false;
-  try {
-    await redisClient.setex(key, ttlSeconds, JSON.stringify(value));
-    return true;
-  } catch (error) {
-    console.error('Cache set error:', error);
-    return false;
+  if (redisClient) {
+    try {
+      await redisClient.setex(key, ttlSeconds, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.error('Cache set error:', error);
+    }
   }
+  memSet(key, value, ttlSeconds);
+  return true;
 };
 
 const cacheDelete = async (key) => {
-  if (!redisClient) return false;
-  try {
-    await redisClient.del(key);
-    return true;
-  } catch (error) {
-    console.error('Cache delete error:', error);
-    return false;
+  if (redisClient) {
+    try { await redisClient.del(key); return true; } catch (e) { console.error(e); }
   }
+  memCache.delete(key);
+  return true;
 };
 
 const cacheDeletePattern = async (pattern) => {
-  if (!redisClient) return false;
-  try {
-    const keys = await redisClient.keys(pattern);
-    if (keys.length > 0) {
-      await redisClient.del(...keys);
-    }
-    return true;
-  } catch (error) {
-    console.error('Cache delete pattern error:', error);
-    return false;
+  if (redisClient) {
+    try {
+      const keys = await redisClient.keys(pattern);
+      if (keys.length > 0) await redisClient.del(...keys);
+      return true;
+    } catch (error) { console.error(error); }
   }
+  // mem wildcard
+  const rx = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+  for (const k of [...memCache.keys()]) if (rx.test(k)) memCache.delete(k);
+  return true;
 };
 
 module.exports = {

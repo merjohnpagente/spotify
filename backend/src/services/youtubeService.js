@@ -269,34 +269,43 @@ const getTrendingSongs = async (limit = 30) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
+  // FAST PATH: search is 2-3× faster than playlist on Render free tier.
+  // Run search fallbacks in parallel and use playlist only as last resort with a short deadline.
   let songs = [];
-
   try {
-    const data = await runYtDlp(TRENDING_PLAYLIST_URL, {
-      flatPlaylist: true,
-      playlistEnd: Math.min(limit, 50),
-    });
-
-    const entries = Array.isArray(data.entries) ? data.entries : [];
-    songs = entries
-      .map(formatFlatEntry)
-      .filter((s) => s && s.videoId && VIDEO_ID_PATTERN.test(s.videoId))
-      .slice(0, limit);
-  } catch (error) {
-    console.error('yt-dlp trending playlist error:', error.message);
+    const fallbackQueries = ['top hits 2025', 'viral songs 2025', 'trending music'];
+    const parallel = await Promise.all(
+      fallbackQueries.map((q) => searchSongs(q, Math.ceil(limit / fallbackQueries.length)).catch(() => []))
+    );
+    const seen = new Set();
+    for (const bucket of parallel) {
+      for (const s of bucket) {
+        if (!seen.has(s.videoId) && songs.length < limit) {
+          seen.add(s.videoId);
+          songs.push(s);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('trending search fast-path failed', e.message);
   }
 
-  if (songs.length < 5) {
-    const fallbackQueries = ['top hits', 'trending music', 'popular songs'];
-    for (const query of fallbackQueries) {
-      if (songs.length >= limit) break;
-      try {
-        const extra = await searchSongs(query, limit - songs.length);
-        const seen = new Set(songs.map((s) => s.videoId));
-        songs.push(...extra.filter((s) => !seen.has(s.videoId)));
-      } catch (error) {
-        console.error('Trending fallback failed:', error.message);
-      }
+  // If we already have enough, skip slow playlist. Otherwise try it with a hard 25s cap so users don't wait 60s.
+  if (songs.length < Math.min(limit, 10)) {
+    try {
+      const data = await runYtDlp(TRENDING_PLAYLIST_URL, {
+        flatPlaylist: true,
+        playlistEnd: Math.min(limit, 20),
+      }, 25000);
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      const playlistSongs = entries
+        .map(formatFlatEntry)
+        .filter((s) => s && s.videoId && VIDEO_ID_PATTERN.test(s.videoId))
+        .slice(0, limit);
+      const seen = new Set(songs.map((s) => s.videoId));
+      songs.push(...playlistSongs.filter((s) => !seen.has(s.videoId)));
+    } catch (error) {
+      console.error('yt-dlp trending playlist error (non-fatal):', error.message);
     }
   }
 

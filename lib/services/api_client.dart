@@ -86,7 +86,7 @@ class ApiClient {
     http.Response response;
     try {
       response = await _dispatch(method, uri, headers, encodedBody)
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 90));
     } on TimeoutException {
       if (!networkRetry) {
         // Free hosting (Render) sleeps when idle; the first call may take a
@@ -95,7 +95,7 @@ class ApiClient {
             body: body, auth: auth, retried: retried, networkRetry: true);
       }
       throw const ApiException(0,
-          'The server is taking too long to respond. Please try again in a moment.');
+          'The server is waking up — Render free tier sleeps when idle. Please tap Retry in a few seconds.');
     } catch (e) {
       if (_isNetworkError(e)) {
         if (!networkRetry) {
