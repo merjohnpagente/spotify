@@ -35,164 +35,170 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       backgroundColor: SpotifyColors.primaryBackground,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 48),
-                const Text(
-                  'Spotify Clone',
-                  style: TextStyle(
-                    color: SpotifyColors.textPrimary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Stream music ad-free with YouTube',
-                  style: const TextStyle(
-                    color: SpotifyColors.textSecondary,
-                    fontSize: 16,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 48),
-                _buildInputField(
-                  controller: _emailController,
-                  label: 'Email',
-                  hint: 'Enter your email',
-                  icon: Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                _buildInputField(
-                  controller: _passwordController,
-                  label: 'Password',
-                  hint: 'Enter your password',
-                  icon: Icons.lock_outline,
-                  obscureText: _obscurePassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      color: SpotifyColors.textSecondary,
-                    ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (value.length < 8) {
-                      return 'Password must be at least 8 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      'Forgot Password?',
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Spotify',
                       style: TextStyle(
-                        color: SpotifyColors.primaryAccent,
-                        fontSize: 14,
+                        color: SpotifyColors.textPrimary,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SignInButton(
-                  text: 'Sign In',
-                  onPressed: _handleLogin,
-                  loading: _isSubmitting,
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    const Expanded(child: Divider(color: SpotifyColors.dividerColor)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'OR',
-                        style: const TextStyle(
-                          color: SpotifyColors.textSecondary,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    const Expanded(child: Divider(color: SpotifyColors.dividerColor)),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                SocialButton(
-                  text: 'Continue with Google',
-                  icon: Icons.g_mobiledata,
-                  onPressed: _handleGoogleSignIn,
-                  loading: _isGoogleLoading,
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Don\'t have an account? ',
-                      style: const TextStyle(
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Stream music ad-free with YouTube',
+                      style: TextStyle(
                         color: SpotifyColors.textSecondary,
-                        fontSize: 14,
+                        fontSize: 16,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                        );
+                    const SizedBox(height: 48),
+                    _buildInputField(
+                      controller: _emailController,
+                      label: 'Email',
+                      hint: 'Enter your email',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
                       },
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          color: SpotifyColors.primaryAccent,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInputField(
+                      controller: _passwordController,
+                      label: 'Password',
+                      hint: 'Enter your password',
+                      icon: Icons.lock_outline,
+                      obscureText: _obscurePassword,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          color: SpotifyColors.textSecondary,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        if (value.length < 8) {
+                          return 'Password must be at least 8 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {},
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: SpotifyColors.primaryAccent,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    SignInButton(
+                      text: 'Sign In',
+                      onPressed: _handleLogin,
+                      loading: _isSubmitting,
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider(color: SpotifyColors.dividerColor)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            'OR',
+                            style: const TextStyle(
+                              color: SpotifyColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const Expanded(child: Divider(color: SpotifyColors.dividerColor)),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    SocialButton(
+                      text: 'Continue with Google',
+                      icon: Icons.g_mobiledata,
+                      onPressed: _handleGoogleSignIn,
+                      loading: _isGoogleLoading,
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Don\'t have an account? ',
+                          style: const TextStyle(
+                            color: SpotifyColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                            );
+                          },
+                          child: const Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              color: SpotifyColors.primaryAccent,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (kIsWeb) ...[
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: () => launchUrl(
+                          Uri.parse('https://merjohnpagente.github.io/spotify/SpotifyFY.apk'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        icon: const Icon(
+                          Icons.android,
+                          size: 18,
+                          color: SpotifyColors.textSecondary,
+                        ),
+                        label: const Text(
+                          'Download Android app (APK)',
+                          style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 13),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                if (kIsWeb) ...[
-                  const SizedBox(height: 16),
-                  TextButton.icon(
-                    onPressed: () => launchUrl(
-                      Uri.parse('https://merjohnpagente.github.io/spotify/SpotifyFY.apk'),
-                      mode: LaunchMode.externalApplication,
-                    ),
-                    icon: const Icon(
-                      Icons.android,
-                      size: 18,
-                      color: SpotifyColors.textSecondary,
-                    ),
-                    label: const Text(
-                      'Download Android app (APK)',
-                      style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 13),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),

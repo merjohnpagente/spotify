@@ -1,11 +1,11 @@
 {
-    "name": "spotify",
-    "short_name": "spotify",
+    "name": "Spotify",
+    "short_name": "Spotify",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Spotify - Stream music ad-free with YouTube.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

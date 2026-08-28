@@ -45,9 +45,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,6 +220,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                 ),
               ],
+            ),
+          ),
             ),
           ),
         ),

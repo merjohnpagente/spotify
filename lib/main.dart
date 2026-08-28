@@ -36,7 +36,7 @@ class SpotifyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Spotify Clone',
+      title: 'Spotify',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       initialRoute: '/',
