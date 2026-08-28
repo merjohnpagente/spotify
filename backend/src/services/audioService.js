@@ -12,11 +12,12 @@ const AUDIO_CACHE_TTL = config.audio.cacheTtlHours * 60 * 60;
 // work with the default web client, datacenter IPs (Render etc.) often need
 // mobile clients. We probe strategies in order and REMEMBER the winner, so
 // after the first successful play the fast path is used immediately.
+// On Render (datacenter) android succeeds in ~6s while default fails after 25s — put android first.
 const STRATEGIES = [
-  { label: 'default', extractorArgs: null },
   { label: 'android', extractorArgs: 'youtube:player_client=android' },
   { label: 'ios', extractorArgs: 'youtube:player_client=ios' },
   { label: 'mweb', extractorArgs: 'youtube:player_client=mweb' },
+  { label: 'default', extractorArgs: null },
   { label: 'tv_embedded', extractorArgs: 'youtube:player_client=tv_embedded' },
   { label: 'web_embedded', extractorArgs: 'youtube:player_client=web_embedded' },
 ];
@@ -51,7 +52,7 @@ const pickAudioUrl = (result) => {
 };
 
 // Test ONE strategy in isolation (used by the debug probe and by the chain).
-const extractWithStrategy = async (url, strategyLabel, timeoutMs = 25000) => {
+const extractWithStrategy = async (url, strategyLabel, timeoutMs = 15000) => {
   const strategy =
     STRATEGIES.find((s) => s.label === strategyLabel) || STRATEGIES[0];
   const result = await runYtDlp(url, strategyOptions(strategy), timeoutMs);
@@ -62,8 +63,9 @@ const extractWithStrategy = async (url, strategyLabel, timeoutMs = 25000) => {
 };
 
 const extractWithFallbacks = async (url) => {
-  // Hard deadline so the HTTP request always answers in bounded time.
-  const deadline = Date.now() + 90000;
+  // Hard deadline 60s so Render (30s proxy timeout is increased) + client 90s always wins.
+  // With android first, most videos succeed in 5-10s, no 25s waste on failing default.
+  const deadline = Date.now() + 60000;
   const order = preferredStrategy
     ? [
         ...STRATEGIES.filter((s) => s.label === preferredStrategy),
@@ -73,9 +75,9 @@ const extractWithFallbacks = async (url) => {
 
   let lastError = null;
   for (const strategy of order) {
-    if (Date.now() > deadline - 25000) break;
+    if (Date.now() > deadline - 15000) break;
     try {
-      const audioUrl = await extractWithStrategy(url, strategy.label);
+      const audioUrl = await extractWithStrategy(url, strategy.label, 15000);
       return audioUrl;
     } catch (error) {
       lastError = error;

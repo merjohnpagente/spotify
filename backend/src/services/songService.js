@@ -133,7 +133,8 @@ const getSongByIdService = async (videoId) => {
 };
 
 const getSongStreamUrl = async (videoId) => {
-  await incrementAccessCount(videoId);
+  // Don't block playback on DB counter — fire and forget
+  incrementAccessCount(videoId).catch(() => {});
   return extractAudioUrl(videoId);
 };
 
