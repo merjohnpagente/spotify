@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/services/api_client.dart';
+import 'package:spotify_fy/services/direct_audio_service.dart';
 import 'package:spotify_fy/services/music_service.dart';
 import 'package:spotify_fy/services/token_store.dart';
 
@@ -86,6 +87,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   final Random _random = Random();
   final Set<String> _likedIds = {};
   bool _reportingHistory = false;
+  final DirectAudioService _direct = DirectAudioService();
 
   PlayerController(this._ref, this._music, this._tokenStore)
       : _player = AudioPlayer(),
@@ -165,8 +167,28 @@ class PlayerController extends StateNotifier<PlayerState> {
           .read(authProvider)
           .user
           ?.preferences['audioQuality'] as String?;
-      // On Web the direct googlevideo URL is blocked by CORS, so prefer
-      // the backend proxy which pipes bytes with CORS headers.
+      // PureTuber-style: on Android/iOS talk to YouTube directly (~1s) — no server hop.
+      // Web must use server proxy (CORS).
+      if (!kIsWeb) {
+        final directUrl = await _direct.getAudioUrl(videoId);
+        if (directUrl != null) {
+          try {
+            await _player.stop();
+            await _player.setSource(UrlSource(directUrl));
+            await _player.setVolume(state.volume);
+            await _player.resume();
+            state = state.copyWith(
+              loading: false,
+              isPlaying: true,
+              isLiked: _likedIds.contains(videoId),
+              likedLoaded: true,
+            );
+            return;
+          } catch (_) {
+            // direct failed — fall through to server
+          }
+        }
+      }
       String url;
       if (kIsWeb) {
         url = _music.getAudioProxyUrl(videoId, quality: quality);
@@ -174,7 +196,6 @@ class PlayerController extends StateNotifier<PlayerState> {
         try {
           url = await _music.getStreamUrl(videoId, quality: quality);
         } catch (_) {
-          // Fallback to proxy if direct extraction fails
           url = _music.getAudioProxyUrl(videoId, quality: quality);
         }
       }
@@ -419,6 +440,7 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   @override
   void dispose() {
+    _direct.dispose();
     _player.dispose();
     super.dispose();
   }

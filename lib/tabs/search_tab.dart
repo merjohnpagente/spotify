@@ -52,7 +52,7 @@ class _SearchTabState extends ConsumerState<SearchTab> {
       setState(() => _query = '');
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 400), () {
+    _debounce = Timer(const Duration(milliseconds: 250), () {
       if (mounted) {
         setState(() => _query = text.trim());
       }

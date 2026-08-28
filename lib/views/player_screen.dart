@@ -114,14 +114,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: song != null
-                                ? Image.network(
-                                    song.thumbnailUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        _buildArtworkFallback(),
-                                  )
-                                : _buildArtworkFallback(),
+                            child: Container(
+                              color: SpotifyColors.cardBackground,
+                              child: song != null
+                                  ? Image.network(
+                                      song.thumbnailUrl,
+                                      fit: BoxFit.contain,
+                                      width: 280,
+                                      height: 280,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          _buildArtworkFallback(),
+                                    )
+                                  : _buildArtworkFallback(),
+                            ),
                           ),
                         ),
                       ),
