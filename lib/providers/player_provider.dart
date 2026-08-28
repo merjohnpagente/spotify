@@ -11,6 +11,7 @@ import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/services/direct_audio_service.dart';
 import 'package:spotify_fy/services/music_service.dart';
 import 'package:spotify_fy/services/token_store.dart';
+import 'package:spotify_fy/services/web_audio_service.dart';
 
 enum RepeatMode { off, all, one }
 
@@ -88,6 +89,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   final Set<String> _likedIds = {};
   bool _reportingHistory = false;
   final DirectAudioService _direct = DirectAudioService();
+  final WebAudioService _webDirect = WebAudioService();
 
   PlayerController(this._ref, this._music, this._tokenStore)
       : _player = AudioPlayer(),
@@ -180,15 +182,15 @@ class PlayerController extends StateNotifier<PlayerState> {
           .user
           ?.preferences['audioQuality'] as String?;
       // PureTuber-style: on Android/iOS talk to YouTube directly (~1s) — no server hop.
-      // Web must use server proxy (CORS).
+      // Web tries CORS-proxy direct first, then server proxy (CORS).
       if (!kIsWeb) {
         final directUrl = await _direct.getAudioUrl(videoId);
         if (directUrl != null) {
           try {
             await _player.stop();
-            await _player.setSource(UrlSource(directUrl));
+            await _player.setSource(UrlSource(directUrl)).timeout(const Duration(seconds: 20));
             await _player.setVolume(state.volume);
-            await _player.resume();
+            await _player.resume().timeout(const Duration(seconds: 10));
             state = state.copyWith(
               loading: false,
               isPlaying: true,
@@ -203,6 +205,25 @@ class PlayerController extends StateNotifier<PlayerState> {
       }
       String url;
       if (kIsWeb) {
+        // Web: try CORS direct first (~2s), like PureTuber, then proxy
+        final webUrl = await _webDirect.getAudioUrl(videoId);
+        if (webUrl != null) {
+          try {
+            await _player.stop();
+            await _player.setSource(UrlSource(webUrl)).timeout(const Duration(seconds: 20));
+            await _player.setVolume(state.volume);
+            await _player.resume().timeout(const Duration(seconds: 10));
+            state = state.copyWith(
+              loading: false,
+              isPlaying: true,
+              isLiked: _likedIds.contains(videoId),
+              likedLoaded: true,
+            );
+            return;
+          } catch (_) {
+            // cors direct failed — fall through to proxy
+          }
+        }
         url = _music.getAudioProxyUrl(videoId, quality: quality);
       } else {
         try {
@@ -212,9 +233,9 @@ class PlayerController extends StateNotifier<PlayerState> {
         }
       }
       await _player.stop();
-      await _player.setSource(UrlSource(url));
+      await _player.setSource(UrlSource(url)).timeout(const Duration(seconds: 20));
       await _player.setVolume(state.volume);
-      await _player.resume();
+      await _player.resume().timeout(const Duration(seconds: 10));
       state = state.copyWith(
         loading: false,
         isPlaying: true,
