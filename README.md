@@ -35,6 +35,8 @@ The API runs on http://localhost:3000.
 
 `yt-dlp` is bundled at `backend/bin/yt-dlp.exe` and configured via `YT_DLP_PATH` in `backend/.env`. Keep it updated now and then so YouTube extraction keeps working.
 
+> **Env notes:** `AUDIO_CACHE_TTL_HOURS` default **5h** (below 6h googlevideo expiry) — cache is intentionally shorter than the ~6h signed-URL expiry so stale URLs are never served. `FRONTEND_URL` accepts a comma-separated list for CORS (e.g. `https://merjohnpagente.github.io/spotify/,http://localhost:3000`) for GitHub Pages + local. `android/app/google-services.json` is gitignored — add your own Firebase config locally; "Continue with Google" needs it.
+
 ### 2. Start the Flutter app
 
 ```bash
