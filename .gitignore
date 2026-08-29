@@ -1,8 +1,9 @@
 # opencode workspace scaffolding
 .opencode/
-docs/
-prompts/
-opencode.json
+# keep docs/ and opencode.json versioned (spec hygiene M1)
+# docs/
+# prompts/
+# opencode.json
 
 # misc
 assets/resume.pdf
@@ -32,6 +33,7 @@ build/
 /android/.gradle/
 /android/local.properties
 /android/key.properties
+android/app/google-services.json
 
 # iOS/macOS
 /ios/Pods/

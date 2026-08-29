@@ -63,13 +63,13 @@ class ArtistScreen extends ConsumerWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      SpotifyColors.primaryAccent.withOpacity(0.9),
-                      SpotifyColors.primaryAccent.withOpacity(0.4),
+                      SpotifyColors.primaryAccent.withValues(alpha: 0.9),
+                      SpotifyColors.primaryAccent.withValues(alpha: 0.4),
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: SpotifyColors.primaryAccent.withOpacity(0.3),
+                      color: SpotifyColors.primaryAccent.withValues(alpha: 0.3),
                       blurRadius: 20,
                       spreadRadius: 4,
                     ),

@@ -101,12 +101,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: SpotifyColors.primaryAccent.withOpacity(playing ? 0.4 : 0.1),
+                                color: SpotifyColors.primaryAccent.withValues(alpha: playing ? 0.4 : 0.1),
                                 blurRadius: playing ? 40 : 10,
                                 spreadRadius: playing ? 10 : 0,
                               ),
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.5),
+                                color: Colors.black.withValues(alpha: 0.5),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),
@@ -183,7 +183,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               inactiveTrackColor: SpotifyColors.dividerColor,
                               thumbColor: SpotifyColors.primaryAccent,
                               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                              overlayColor: SpotifyColors.primaryAccent.withOpacity(0.2),
+                              overlayColor: SpotifyColors.primaryAccent.withValues(alpha: 0.2),
                               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                             ),
                             child: Slider(
@@ -293,7 +293,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                                 inactiveTrackColor: SpotifyColors.dividerColor,
                                 thumbColor: SpotifyColors.primaryAccent,
                                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                                overlayColor: SpotifyColors.primaryAccent.withOpacity(0.2),
+                                overlayColor: SpotifyColors.primaryAccent.withValues(alpha: 0.2),
                                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                               ),
                               child: Slider(
@@ -389,7 +389,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: SpotifyColors.primaryAccent.withOpacity(0.4),
+              color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
               blurRadius: 20,
               spreadRadius: 5,
             ),

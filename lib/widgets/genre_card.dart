@@ -64,8 +64,8 @@ class _GenreCardState extends State<GenreCard> with SingleTickerProviderStateMix
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  widget.color.withOpacity(0.8),
-                  widget.color.withOpacity(0.4),
+                  widget.color.withValues(alpha: 0.8),
+                  widget.color.withValues(alpha: 0.4),
                 ],
               ),
             ),
@@ -79,7 +79,7 @@ class _GenreCardState extends State<GenreCard> with SingleTickerProviderStateMix
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           colorBlendMode: BlendMode.darken,
                           errorBuilder: (context, error, stackTrace) =>
                               _buildFallback(),

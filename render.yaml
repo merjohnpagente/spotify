@@ -28,9 +28,9 @@ services:
         value: 1h
       - key: JWT_REFRESH_EXPIRY
         value: 30d
-      # Only allow the GitHub Pages site in production CORS.
+      # Allow GitHub Pages + local dev (CORS comma-list, see backend/src/app.js)
       - key: FRONTEND_URL
-        value: https://merjohnpagente.github.io
+        value: https://merjohnpagente.github.io/spotify,https://merjohnpagente.github.io
       # Faster playback — avoid Render killing slow yt-dlp
       - key: REQUEST_TIMEOUT
         value: 90000

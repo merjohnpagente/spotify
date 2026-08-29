@@ -71,13 +71,13 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        SpotifyColors.primaryAccent.withOpacity(0.8),
-                        SpotifyColors.primaryAccent.withOpacity(0.4),
+                        SpotifyColors.primaryAccent.withValues(alpha: 0.8),
+                        SpotifyColors.primaryAccent.withValues(alpha: 0.4),
                       ],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: SpotifyColors.primaryAccent.withOpacity(0.3),
+                        color: SpotifyColors.primaryAccent.withValues(alpha: 0.3),
                         blurRadius: 20,
                         spreadRadius: 5,
                       ),
@@ -165,7 +165,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             trailing: Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: SpotifyColors.primaryAccent,
+              activeThumbColor: SpotifyColors.primaryAccent,
               inactiveThumbColor: SpotifyColors.textSecondary,
               inactiveTrackColor: SpotifyColors.cardBackground,
             ),

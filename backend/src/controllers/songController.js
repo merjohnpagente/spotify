@@ -99,7 +99,9 @@ const audioProxy = catchAsync(async (req, res) => {
   req.on('close', () => {
     try {
       proxyReq.destroy();
-    } catch (_) {}
+    } catch (_) {
+      // ignore destroy error
+    }
   });
 
   proxyReq.end();

@@ -128,7 +128,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
             ),
             value: _notifications,
-            activeColor: SpotifyColors.primaryAccent,
+            activeThumbColor: SpotifyColors.primaryAccent,
             onChanged: (value) async {
               setState(() => _notifications = value);
               final prefs = await ref.read(sharedPreferencesProvider.future);

@@ -66,6 +66,7 @@ class WebAudioService {
     return (pick.first as Map)['url'] as String?;
   }
 
+  // ignore: unused_element
   Future<String?> _tryProxy(String proxyUrl, String videoId, Duration timeout) async {
     try {
       final body = jsonEncode({

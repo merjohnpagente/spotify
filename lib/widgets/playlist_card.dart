@@ -47,7 +47,7 @@ class _PlaylistCardState extends State<PlaylistCard> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final gradientColors = widget.gradientColors ?? [
-      SpotifyColors.primaryAccent.withOpacity(0.8),
+      SpotifyColors.primaryAccent.withValues(alpha: 0.8),
       Colors.transparent,
     ];
 
@@ -64,9 +64,7 @@ class _PlaylistCardState extends State<PlaylistCard> with SingleTickerProviderSt
               child: child,
             );
           },
-          child: Container(
-            width: 160,
-            child: Column(
+          child: SizedBox(width: 160, child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Stack(

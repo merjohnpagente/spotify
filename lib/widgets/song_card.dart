@@ -94,7 +94,7 @@ class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: SpotifyColors.primaryAccent.withOpacity(0.4),
+                                color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
                                 blurRadius: 12,
                                 spreadRadius: 2,
                               ),

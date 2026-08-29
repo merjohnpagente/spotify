@@ -22,7 +22,7 @@ class SignInButton extends StatelessWidget {
         onPressed: loading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: SpotifyColors.primaryAccent,
-          disabledBackgroundColor: SpotifyColors.primaryAccent.withOpacity(0.6),
+          disabledBackgroundColor: SpotifyColors.primaryAccent.withValues(alpha: 0.6),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),

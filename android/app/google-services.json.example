@@ -1,0 +1,6 @@
+{
+  "hint": "Copy your Firebase android/app/google-services.json here. This file is gitignored. Get it from Firebase Console > Project Settings > Your apps > google-services.json. Required only for Google Sign-In on Android.",
+  "project_info": {
+    "project_id": "your-firebase-project-id"
+  }
+}
