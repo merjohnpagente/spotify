@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/music_providers.dart';
+import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
 import 'package:spotify_fy/views/artist_screen.dart';
@@ -243,30 +244,50 @@ class _SearchTabState extends ConsumerState<SearchTab> {
       loading: () => const Center(
         child: CircularProgressIndicator(color: SpotifyColors.primaryAccent),
       ),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                e.toString(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => ref.invalidate(searchResultsProvider(_query)),
-                icon: const Icon(Icons.refresh, color: SpotifyColors.primaryAccent, size: 18),
-                label: const Text(
-                  'Retry',
-                  style: TextStyle(color: SpotifyColors.primaryAccent),
+      error: (e, _) {
+        final msgLower = e.toString().toLowerCase();
+        final isNetworkError = (e is ApiException && e.statusCode == 0) ||
+            msgLower.contains('cannot reach server') ||
+            msgLower.contains('waking up');
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  e.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
                 ),
-              ),
-            ],
+                if (isNetworkError) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Base URL: ${ApiClient.defaultBaseUrl}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'If on physical device, run: flutter run --dart-define=API_BASE_URL=http://<YOUR_PC_IP>:3000',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => ref.invalidate(searchResultsProvider(_query)),
+                  icon: const Icon(Icons.refresh, color: SpotifyColors.primaryAccent, size: 18),
+                  label: const Text(
+                    'Retry',
+                    style: TextStyle(color: SpotifyColors.primaryAccent),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

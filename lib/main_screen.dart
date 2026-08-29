@@ -146,10 +146,16 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
             Positioned(
               left: 0,
               right: 0,
-              bottom: 56,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: _buildMiniPlayer(player),
+              bottom: 0,
+              child: SafeArea(
+                bottom: true,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 56),
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: _buildMiniPlayer(player),
+                  ),
+                ),
               ),
             ),
         ],

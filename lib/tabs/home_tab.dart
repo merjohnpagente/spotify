@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/music_providers.dart';
+import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
 import 'package:spotify_fy/widgets/song_card.dart';
@@ -127,6 +128,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               error: (e, _) => _ErrorSection(
                 message: 'Could not load trending songs',
                 onRetry: () => ref.invalidate(trendingSongsProvider),
+                error: e,
               ),
             ),
             const SizedBox(height: 32),
@@ -174,6 +176,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               error: (e, _) => _ErrorSection(
                 message: 'Could not load new releases',
                 onRetry: () => ref.invalidate(newReleasesProvider),
+                error: e,
               ),
             ),
           ],
@@ -256,10 +259,26 @@ class _EmptySection extends StatelessWidget {
 }
 
 class _ErrorSection extends StatelessWidget {
-  const _ErrorSection({required this.message, required this.onRetry});
+  const _ErrorSection({
+    required this.message,
+    required this.onRetry,
+    this.error,
+  });
 
   final String message;
   final VoidCallback onRetry;
+  final Object? error;
+
+  bool get _isNetworkError {
+    if (error == null) return false;
+    if (error is ApiException && (error as ApiException).statusCode == 0) return true;
+    final lower = error.toString().toLowerCase();
+    return lower.contains('cannot reach server') ||
+        lower.contains('waking up') ||
+        lower.contains('socketexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('connection refused');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -269,8 +288,36 @@ class _ErrorSection extends StatelessWidget {
         children: [
           Text(
             message,
+            textAlign: TextAlign.center,
             style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
           ),
+          if (error != null && _isNetworkError) ...[
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Base URL: ${ApiClient.defaultBaseUrl}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'If on physical device, run: flutter run --dart-define=API_BASE_URL=http://<YOUR_PC_IP>:3000',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+            ),
+          ] else if (error != null && error.toString().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 12),
           TextButton(
             onPressed: onRetry,

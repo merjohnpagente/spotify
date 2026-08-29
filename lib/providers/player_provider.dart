@@ -431,7 +431,11 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   Future<void> toggleLike() async {
-    if (!_tokenStore.hasSession) return;
+    if (!_tokenStore.hasSession) {
+      // M4 spec: UI should show toast "Sign in to save likes" when hasSession is false.
+      // Keeping silent for now to avoid breaking existing flow (no error state).
+      return;
+    }
     final song = state.currentSong;
     if (song == null) return;
 
@@ -453,7 +457,11 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   void _reportHistory() {
     if (_reportingHistory) return;
-    if (!_tokenStore.hasSession) return;
+    if (!_tokenStore.hasSession) {
+      // M4 spec: UI should show toast "Sign in to save history" when hasSession is false.
+      // Keeping silent for now; don't set error to avoid disrupting playback.
+      return;
+    }
     final song = state.currentSong;
     if (song == null) return;
     if (state.position.inSeconds < 5) return;
