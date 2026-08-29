@@ -233,9 +233,9 @@ class PlayerController extends StateNotifier<PlayerState> {
         }
       }
       await _player.stop();
-      await _player.setSource(UrlSource(url)).timeout(const Duration(seconds: 20));
+      await _player.setSource(UrlSource(url)).timeout(const Duration(seconds: 90));
       await _player.setVolume(state.volume);
-      await _player.resume().timeout(const Duration(seconds: 10));
+      await _player.resume().timeout(const Duration(seconds: 30));
       state = state.copyWith(
         loading: false,
         isPlaying: true,
@@ -252,9 +252,9 @@ class PlayerController extends StateNotifier<PlayerState> {
               ?.preferences['audioQuality'] as String?;
           final proxyUrl = _music.getAudioProxyUrl(videoId, quality: quality);
           await _player.stop();
-          await _player.setSource(UrlSource(proxyUrl));
+          await _player.setSource(UrlSource(proxyUrl)).timeout(const Duration(seconds: 90));
           await _player.setVolume(state.volume);
-          await _player.resume();
+          await _player.resume().timeout(const Duration(seconds: 30));
           state = state.copyWith(
             loading: false,
             isPlaying: true,
@@ -279,9 +279,9 @@ class PlayerController extends StateNotifier<PlayerState> {
               ?.preferences['audioQuality'] as String?;
           final proxyUrl = _music.getAudioProxyUrl(videoId, quality: quality);
           await _player.stop();
-          await _player.setSource(UrlSource(proxyUrl));
+          await _player.setSource(UrlSource(proxyUrl)).timeout(const Duration(seconds: 90));
           await _player.setVolume(state.volume);
-          await _player.resume();
+          await _player.resume().timeout(const Duration(seconds: 30));
           state = state.copyWith(
             loading: false,
             isPlaying: true,
