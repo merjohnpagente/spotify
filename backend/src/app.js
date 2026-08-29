@@ -13,7 +13,8 @@ const app = express();
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(
   cors({
-    origin: config.nodeEnv === 'production' ? config.frontend.url : true,
+    // Support comma-separated FRONTEND_URL for GitHub Pages + local
+    origin: config.nodeEnv === 'production' ? config.frontend.url.split(',').map(s=>s.trim()).filter(Boolean) : true,
     credentials: true,
   })
 );

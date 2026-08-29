@@ -26,7 +26,8 @@ const songSchema = new mongoose.Schema({
   },
   duration: {
     type: Number,
-    required: true,
+    required: false,
+    default: 0,
   },
   thumbnailUrl: {
     type: String,
@@ -38,7 +39,8 @@ const songSchema = new mongoose.Schema({
   },
   channelId: {
     type: String,
-    required: true,
+    required: false,
+    default: 'unknown',
   },
   genre: {
     type: String,
@@ -79,7 +81,7 @@ songSchema.index({ title: 'text', artist: 'text', album: 'text' });
 songSchema.methods.isAudioCacheValid = function() {
   if (!this.audioUrlCached || !this.audioExtractedAt) return false;
   const cacheAgeHours = (Date.now() - this.audioExtractedAt.getTime()) / (1000 * 60 * 60);
-  return cacheAgeHours < 12;
+  return cacheAgeHours < 5; // 5h < googlevideo 6h expiry
 };
 
 songSchema.methods.toPublicJSON = function() {

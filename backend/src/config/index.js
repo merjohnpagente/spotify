@@ -61,6 +61,6 @@ module.exports = {
   
   audio: {
     ytDlpPath: process.env.YT_DLP_PATH || 'yt-dlp',
-    cacheTtlHours: parseInt(process.env.AUDIO_CACHE_TTL_HOURS) || 12,
+    cacheTtlHours: parseInt(process.env.AUDIO_CACHE_TTL_HOURS) || 5,
   },
 };
