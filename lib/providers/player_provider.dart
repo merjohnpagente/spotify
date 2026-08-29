@@ -139,7 +139,19 @@ class PlayerController extends StateNotifier<PlayerState> {
   Future<void> playQueue(List<Song> songs, {int index = 0}) async {
     if (songs.isEmpty) return;
     final safeIndex = index.clamp(0, songs.length - 1);
-    final dur = Duration(seconds: songs[safeIndex].duration > 0 ? songs[safeIndex].duration : 0);
+    var song = songs[safeIndex];
+    // If backend flat entry missed duration (0), try to hydrate from detail (fixes 00:00 in Image1)
+    if (song.duration == 0) {
+      try {
+        final hydrated = await _music.getSong(song.videoId);
+        if (hydrated.duration > 0) {
+          song = hydrated;
+          songs = List<Song>.from(songs);
+          songs[safeIndex] = song;
+        }
+      } catch (_) {}
+    }
+    final dur = Duration(seconds: song.duration > 0 ? song.duration : 0);
     state = state.copyWith(
       queue: List.of(songs),
       currentIndex: safeIndex,
@@ -149,8 +161,8 @@ class PlayerController extends StateNotifier<PlayerState> {
       clearError: true,
     );
     // Guard long compilations — PureTuber also fails on 3h mixes
-    final titleLower = songs[safeIndex].title.toLowerCase();
-    if (songs[safeIndex].duration > 1800 ||
+    final titleLower = song.title.toLowerCase();
+    if (song.duration > 1800 ||
         titleLower.contains('top 100') && titleLower.contains('billboard') ||
         titleLower.contains('compilation')) {
       // still try, but warn — long mixes often timeout on extraction
@@ -291,10 +303,14 @@ class PlayerController extends StateNotifier<PlayerState> {
           return;
         } catch (_) {}
       }
+      final msg = e.toString().toLowerCase();
+      final isTimeout = msg.contains('timeoutexception') || msg.contains('future not completed');
       state = state.copyWith(
         loading: false,
         isPlaying: false,
-        error: 'Could not play this song: $e',
+        error: isTimeout
+            ? 'Could not play: server waking up or YouTube blocked. Tap Retry in 10s (90s timeout).'
+            : 'Could not play this song: $e',
       );
     }
   }

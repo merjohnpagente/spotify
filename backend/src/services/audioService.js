@@ -90,7 +90,8 @@ const extractWithFallbacks = async (url) => {
 };
 
 const fetchViaInvidious = async (videoId) => {
-  const hosts = ['https://inv.tux.pizza', 'https://yewtu.be', 'https://vid.puffyan.us', 'https://invidious.snopyta.org'];
+  // Sorted by uptime 2025-2026: inv.tux.pizza most stable, yewtu.be often 403
+  const hosts = ['https://inv.tux.pizza', 'https://vid.puffyan.us', 'https://yewtu.be', 'https://invidious.snopyta.org', 'https://invidious.lunar.icu'];
   for (const host of hosts) {
     try {
       const controller = new AbortController();
