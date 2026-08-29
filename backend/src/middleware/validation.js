@@ -46,7 +46,7 @@ const playlistValidation = [
 ];
 
 const addSongValidation = [
-  body('videoId').matches(/^[a-zA-Z0-9_-]{11}$/).withMessage('Valid YouTube video ID required'),
+  body('videoId').matches(/^(?:[a-zA-Z0-9_-]{11}|(?:dz|au)_[a-zA-Z0-9_-]+)$/).withMessage('Valid video/track ID required'),
   validate,
 ];
 
@@ -60,7 +60,7 @@ const updatePlaylistValidation = [
 
 const reorderValidation = [
   body('songIds').isArray().withMessage('songIds must be an array'),
-  body('songIds.*').optional().matches(/^[a-zA-Z0-9_-]{11}$/).withMessage('Invalid video ID in songIds'),
+  body('songIds.*').optional().matches(/^(?:[a-zA-Z0-9_-]{11}|(?:dz|au)_[a-zA-Z0-9_-]+)$/).withMessage('Invalid video ID in songIds'),
   validate,
 ];
 
@@ -83,7 +83,7 @@ const searchValidation = [
 ];
 
 const videoIdValidation = [
-  param('videoId').matches(/^[a-zA-Z0-9_-]{11}$/).withMessage('Valid YouTube video ID required'),
+  param('videoId').matches(/^(?:[a-zA-Z0-9_-]{11}|(?:dz|au)_[a-zA-Z0-9_-]+)$/).withMessage('Valid video/track ID required'),
   validate,
 ];
 

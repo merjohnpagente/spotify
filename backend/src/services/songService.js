@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const { Song, UserLike, UserHistory, User } = require('../models');
-const { searchSongs, getTrendingSongs, getSongById, getRecommendations, searchByGenre } = require('./youtubeService');
+const youtubeService = require('./youtubeService');
+const deezerService = require('./deezerService');
+const audiusService = require('./audiusService');
 const { extractAudioUrl, incrementAccessCount } = require('./audioService');
 const { cacheGet, cacheSet, cacheDeletePattern } = require('../config/redis');
 
@@ -49,17 +51,39 @@ const upsertSong = async (ytData) => {
   }
 };
 
+const resolveSongById = async (videoId) => {
+  // Try Deezer/Audius first (prefix), then YouTube
+  if (videoId.startsWith('dz_')) {
+    const dz = await deezerService.getSongById(videoId);
+    if (dz) return dz;
+  }
+  if (videoId.startsWith('au_')) {
+    const au = await audiusService.searchSongs(videoId.slice(3), 1);
+    if (au.length && au[0].videoId === videoId) return au[0];
+    // fallback: fetch via Audius trending search?
+  }
+  // Legacy YouTube 11-char or numeric fallback
+  const yt = await youtubeService.getSongById(videoId);
+  if (yt) return yt;
+  if (videoId.startsWith('dz_') || videoId.startsWith('au_')) return null;
+  // Try Deezer numeric without prefix
+  if (/^\d+$/.test(videoId)) {
+    const dz2 = await deezerService.getSongById(`dz_${videoId}`);
+    if (dz2) return dz2;
+  }
+  return null;
+};
+
 const getOrCreateSong = async (videoId) => {
   if (!isDbReady()) {
-    const youtubeData = await getSongById(videoId);
-    if (!youtubeData) throw new Error('Song not found on YouTube');
-    // Return a mock with toPublicJSON so callers keep working without DB
+    const data = await resolveSongById(videoId);
+    if (!data) throw new Error('Song not found');
     return {
       toPublicJSON: () => ({
         id: null,
         isAvailable: true,
         addedToSystemAt: new Date(),
-        ...youtubeData,
+        ...data,
       }),
       videoId,
     };
@@ -67,11 +91,11 @@ const getOrCreateSong = async (videoId) => {
   let song = await Song.findOne({ videoId });
   
   if (!song) {
-    const youtubeData = await getSongById(videoId);
-    if (!youtubeData) throw new Error('Song not found on YouTube');
+    const data = await resolveSongById(videoId);
+    if (!data) throw new Error('Song not found');
     
     song = await Song.create({
-      ...youtubeData,
+      ...data,
       addedToSystemAt: new Date(),
     });
   }
@@ -84,11 +108,34 @@ const searchSongsService = async (query, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  const youtubeResults = await searchSongs(query, limit);
-  
-  // Fast path: when DB is warming or unavailable, upsert is instant via isDbReady()
-  // Parallelize DB writes so 30 songs don't take 30× latency.
-  const songs = await Promise.all(youtubeResults.map(yt => upsertSong(yt)));
+  // Hybrid: Deezer first (major catalog, no bot block, <800ms), then Audius, then YouTube fallback
+  let results = [];
+  try {
+    const [deezerResults, audiusResults] = await Promise.all([
+      deezerService.searchSongs(query, limit).catch(() => []),
+      audiusService.searchSongs(query, Math.ceil(limit/2)).catch(() => []),
+    ]);
+    const seen = new Set();
+    for (const bucket of [deezerResults, audiusResults]) {
+      for (const s of bucket) {
+        if (!seen.has(s.videoId) && results.length < limit) {
+          seen.add(s.videoId);
+          results.push(s);
+        }
+      }
+    }
+  } catch (_) { /* ignore */ }
+  if (results.length < Math.min(limit, 5)) {
+    try {
+      const ytResults = await youtubeService.searchSongs(query, limit);
+      const seen = new Set(results.map(r => r.videoId));
+      for (const s of ytResults) {
+        if (!seen.has(s.videoId) && results.length < limit) results.push(s);
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  const songs = await Promise.all(results.map(r => upsertSong(r)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;
@@ -99,9 +146,31 @@ const getTrendingSongsService = async (limit = 30) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  const youtubeResults = await getTrendingSongs(limit);
-  
-  const songs = await Promise.all(youtubeResults.map(yt => upsertSong(yt)));
+  let results = [];
+  try {
+    const [deezerTrending, audiusTrending] = await Promise.all([
+      deezerService.getTrendingSongs(limit).catch(() => []),
+      audiusService.getTrendingSongs(Math.ceil(limit/2)).catch(() => []),
+    ]);
+    const seen = new Set();
+    for (const bucket of [deezerTrending, audiusTrending]) {
+      for (const s of bucket) {
+        if (!seen.has(s.videoId) && results.length < limit) {
+          seen.add(s.videoId);
+          results.push(s);
+        }
+      }
+    }
+  } catch (_) { /* ignore */ }
+  if (results.length < Math.min(limit, 10)) {
+    try {
+      const ytResults = await youtubeService.getTrendingSongs(limit);
+      const seen = new Set(results.map(r => r.videoId));
+      for (const s of ytResults) if (!seen.has(s.videoId) && results.length < limit) results.push(s);
+    } catch (_) { /* ignore */ }
+  }
+
+  const songs = await Promise.all(results.map(r => upsertSong(r)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.TRENDING);
   return songs;
@@ -119,15 +188,14 @@ const getSongByIdService = async (videoId) => {
     await cacheSet(cacheKey, result, CACHE_TTL.SONG);
     return result;
   } catch (dbError) {
-    // MongoDB unavailable (or song missing): fall back to YouTube data
-    const youtubeData = await getSongById(videoId);
-    if (!youtubeData) throw new Error('Song not found on YouTube');
-    console.warn('MongoDB unavailable, serving song from YouTube:', dbError.message);
+    const data = await resolveSongById(videoId);
+    if (!data) throw new Error('Song not found');
+    console.warn('MongoDB unavailable, serving song:', dbError.message);
     return {
       id: null,
       isAvailable: true,
       addedToSystemAt: new Date(),
-      ...youtubeData,
+      ...data,
     };
   }
 };
@@ -143,7 +211,19 @@ const getRecommendationsService = async (videoId, limit = 10) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  const recommendations = await getRecommendations(videoId, limit);
+  let recommendations = [];
+  try {
+    recommendations = await youtubeService.getRecommendations(videoId, limit);
+  } catch (_) {
+    // Fallback to Deezer search using song title
+    try {
+      const song = await resolveSongById(videoId);
+      if (song) {
+        const q = `${song.title} ${song.artist}`;
+        recommendations = await deezerService.searchSongs(q, limit);
+      }
+    } catch (_) { /* ignore */ }
+  }
   
   const songs = await Promise.all(recommendations.map(r => upsertSong(r)));
 
@@ -156,9 +236,10 @@ const getSongsByGenre = async (genre, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  const youtubeResults = await searchByGenre(genre, limit);
+  let results = await deezerService.searchSongs(`${genre} music`, limit);
+  if (!results.length) results = await youtubeService.searchByGenre(genre, limit);
   
-  const songs = await Promise.all(youtubeResults.map(yt => upsertSong(yt)));
+  const songs = await Promise.all(results.map(r => upsertSong(r)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;

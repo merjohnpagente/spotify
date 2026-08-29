@@ -3,6 +3,8 @@ const config = require('../config');
 const { Song } = require('../models');
 const { cacheGet, cacheSet } = require('../config/redis');
 const { runYtDlp } = require('./youtubeService');
+const audiusService = require('./audiusService');
+const deezerService = require('./deezerService');
 
 const isDbReady = () => mongoose.connection.readyState === 1;
 
@@ -118,6 +120,36 @@ const extractAudioUrl = async (videoId) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached.url;
 
+  // Fast path: Audius (no bot block, <2s) and Deezer preview (30s) before YouTube
+  if (videoId.startsWith('au_')) {
+    const auUrl = await audiusService.getStreamUrl(videoId);
+    if (auUrl) {
+      await cacheSet(cacheKey, { url: auUrl }, AUDIO_CACHE_TTL);
+      return auUrl;
+    }
+  }
+  if (videoId.startsWith('dz_')) {
+    const dzUrl = await deezerService.getPreviewUrl(videoId);
+    if (dzUrl) {
+      await cacheSet(cacheKey, { url: dzUrl }, AUDIO_CACHE_TTL);
+      return dzUrl;
+    }
+    // Deezer track without preview: try Audius search for same title+artist
+    try {
+      const dzSong = await deezerService.getSongById(videoId);
+      if (dzSong) {
+        const auSearch = await audiusService.searchSongs(`${dzSong.title} ${dzSong.artist}`, 3);
+        if (auSearch.length) {
+          const auUrl = await audiusService.getStreamUrl(auSearch[0].videoId);
+          if (auUrl) {
+            await cacheSet(cacheKey, { url: auUrl }, AUDIO_CACHE_TTL);
+            return auUrl;
+          }
+        }
+      }
+    } catch (_) { /* ignore */ }
+  }
+
   // MongoDB read is best-effort: if the DB is unavailable we still
   // want to serve audio straight from YouTube.
   let song = null;
@@ -134,20 +166,21 @@ const extractAudioUrl = async (videoId) => {
   }
 
   try {
+    // YouTube fallback: race Audius search for title vs yt-dlp (keeps old behavior for yt IDs)
+    // For dz/au we already returned, so this is YouTube 11-char path
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    // Race Invidious (5s) vs yt-dlp (android 6-10s) — whichever wins, return. PureTuber-like speed without waiting 60s sequential.
+    // Try Audius search by videoId text as last fast attempt before slow yt-dlp
     let audioUrl = null;
+    // For dz/au we already returned, so only yt path races Invidious+yt-dlp
     try {
       audioUrl = await Promise.any([
         fetchViaInvidious(videoId).then((u) => { if (!u) throw new Error('invidious empty'); return u; }),
         extractWithFallbacks(url),
       ]);
-      // If Invidious won, mark it
       if (audioUrl && audioUrl.includes('googlevideo.com') === false) {
-        // Could be invidious proxy url still contains googlevideo, keep as is
+        // keep as is
       }
     } catch {
-      // Both raced failed, try sequential Invidious as last resort
       audioUrl = await fetchViaInvidious(videoId);
       if (!audioUrl) {
         audioUrl = await extractWithFallbacks(url);

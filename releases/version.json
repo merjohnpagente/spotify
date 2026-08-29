@@ -1,5 +1,5 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "apkUrl": "https://merjohnpagente.github.io/spotify/SpotifyFY.apk",
-  "message": "Critical fix: 90s playback timeout (was 20s), hydrate 00:00 duration, 5h cache. Update required to play music."
+  "message": "Major: Audius + Deezer APIs for instant playback (no YouTube block). Full tracks + 30s previews."
 }
