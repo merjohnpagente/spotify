@@ -90,11 +90,11 @@ const extractWithFallbacks = async (url) => {
 };
 
 const fetchViaInvidious = async (videoId) => {
-  const hosts = ['https://inv.tux.pizza', 'https://yewtu.be', 'https://vid.puffyan.us'];
+  const hosts = ['https://inv.tux.pizza', 'https://yewtu.be', 'https://vid.puffyan.us', 'https://invidious.snopyta.org'];
   for (const host of hosts) {
     try {
       const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 8000);
+      const t = setTimeout(() => controller.abort(), 5000);
       const resp = await fetch(`${host}/api/v1/videos/${videoId}`, { signal: controller.signal });
       clearTimeout(t);
       if (!resp.ok) continue;
@@ -134,15 +134,27 @@ const extractAudioUrl = async (videoId) => {
 
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    let audioUrl;
+    // Race Invidious (5s) vs yt-dlp (android 6-10s) — whichever wins, return. PureTuber-like speed without waiting 60s sequential.
+    let audioUrl = null;
     try {
-      audioUrl = await extractWithFallbacks(url);
-    } catch (ytError) {
-      console.warn(`yt-dlp failed for ${videoId}, trying Invidious fallback: ${ytError.message}`);
+      audioUrl = await Promise.any([
+        fetchViaInvidious(videoId).then((u) => { if (!u) throw new Error('invidious empty'); return u; }),
+        extractWithFallbacks(url),
+      ]);
+      // If Invidious won, mark it
+      if (audioUrl && audioUrl.includes('googlevideo.com') === false) {
+        // Could be invidious proxy url still contains googlevideo, keep as is
+      }
+    } catch {
+      // Both raced failed, try sequential Invidious as last resort
       audioUrl = await fetchViaInvidious(videoId);
-      if (!audioUrl) throw ytError;
-      preferredStrategy = 'invidious';
+      if (!audioUrl) {
+        audioUrl = await extractWithFallbacks(url);
+      } else {
+        preferredStrategy = 'invidious';
+      }
     }
+    if (!audioUrl) throw new Error('No audio URL from any source');
 
     // Persisting to MongoDB is best-effort too - never fail playback
     // because the DB write failed.
