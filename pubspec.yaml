@@ -1,7 +1,7 @@
 name: spotify_fy
 description: "A Flutter app that replicates Spotify UI with YouTube backend for ad-free music streaming."
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.12.2

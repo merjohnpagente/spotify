@@ -2,8 +2,8 @@
 /// new APK, and update releases/version.json to match - installed apps
 /// compare themselves against it and prompt the user to update.
 class AppVersion {
-  static const String version = '1.0.1';
-  static const int buildNumber = 2;
+  static const String version = '1.0.2';
+  static const int buildNumber = 3;
 
   static const String apkUrl =
       'https://merjohnpagente.github.io/spotify/SpotifyFY.apk';

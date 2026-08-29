@@ -47,19 +47,26 @@ jobs:
           fi
           sed -i "s|<base href=\"[^\"]*\">|<base href=\"/${REPO_NAME}/\">|" build/web/index.html
 
-      # Ship the prebuilt Android APK alongside the site so anyone can install:
-      # https://merjohnpagente.github.io/spotify/SpotifyFY.apk
-      - name: Include Android APK download
+      # Build Android APK with SAME API_BASE_URL as web so releases/SpotifyFY.apk == web behavior
+      - name: Build Android APK (unified with web)
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://spotify-fy-api.onrender.com' }}
         run: |
-          if [ -f releases/SpotifyFY.apk ]; then
-            cp releases/SpotifyFY.apk build/web/SpotifyFY.apk
-            echo "APK included"
+          if [ -n "$API_BASE_URL" ]; then
+            flutter build apk --release --dart-define=API_BASE_URL="$API_BASE_URL"
           else
-            echo "No APK committed yet - skipping"
+            flutter build apk --release --dart-define=API_BASE_URL="https://spotify-fy-api.onrender.com"
           fi
-          if [ -f releases/version.json ]; then
-            cp releases/version.json build/web/version.json
-          fi
+          mkdir -p releases
+          cp build/app/outputs/flutter-apk/app-release.apk releases/SpotifyFY.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/web/SpotifyFY.apk
+          echo "APK built with API_BASE_URL=$API_BASE_URL"
+          ls -lh releases/SpotifyFY.apk build/web/SpotifyFY.apk
+
+      - name: Publish version.json
+        run: |
+          cp releases/version.json build/web/version.json
+          echo "version.json $(cat releases/version.json)"
 
       - name: Ensure .nojekyll
         run: touch build/web/.nojekyll

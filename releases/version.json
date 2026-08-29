@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "apkUrl": "https://merjohnpagente.github.io/spotify/SpotifyFY.apk",
-  "message": "Faster, more reliable search and playback with update notifications."
+  "message": "Critical fix: 90s playback timeout (was 20s), hydrate 00:00 duration, 5h cache. Update required to play music."
 }
