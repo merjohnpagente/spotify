@@ -27,7 +27,7 @@ const authLimiter = createRateLimiter(
 
 const searchLimiter = createRateLimiter(
   60 * 1000,
-  10,
+  30,
   'Too many search requests, please try again later'
 );
 
