@@ -11,6 +11,8 @@ class Song {
   final String language;
   final bool explicit;
   final bool isAvailable;
+  final String source;
+  final bool isPreview;
 
   const Song({
     required this.videoId,
@@ -25,11 +27,16 @@ class Song {
     required this.language,
     required this.explicit,
     required this.isAvailable,
+    this.source = 'youtube',
+    this.isPreview = false,
   });
 
   factory Song.fromJson(Map<String, dynamic> json) {
+    final vid = json['videoId'] as String? ?? '';
+    final src = json['source'] as String? ?? (vid.startsWith('dz_') ? 'deezer' : vid.startsWith('au_') ? 'audius' : 'youtube');
+    final preview = json['isPreview'] as bool? ?? vid.startsWith('dz_');
     return Song(
-      videoId: json['videoId'] as String? ?? '',
+      videoId: vid,
       title: json['title'] as String? ?? 'Untitled',
       artist: json['artist'] as String? ?? 'Unknown Artist',
       album: json['album'] as String? ?? '',
@@ -41,6 +48,8 @@ class Song {
       language: json['language'] as String? ?? 'en',
       explicit: json['explicit'] as bool? ?? false,
       isAvailable: json['isAvailable'] as bool? ?? true,
+      source: src,
+      isPreview: preview,
     );
   }
 

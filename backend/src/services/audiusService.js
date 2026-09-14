@@ -25,6 +25,7 @@ const mapAudiusTrack = (t) => {
     language: 'en',
     explicit: false,
     source: 'audius',
+    isPreview: false,
   };
 };
 

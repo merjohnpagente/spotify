@@ -56,6 +56,14 @@ const songSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  source: {
+    type: String,
+    default: 'youtube',
+  },
+  isPreview: {
+    type: Boolean,
+    default: false,
+  },
   audioUrlCached: {
     type: String,
     default: null,
@@ -100,6 +108,8 @@ songSchema.methods.toPublicJSON = function() {
     explicit: this.explicit,
     isAvailable: this.isAvailable,
     addedToSystemAt: this.addedToSystemAt,
+    source: this.source || (this.videoId && this.videoId.startsWith('dz_') ? 'deezer' : this.videoId && this.videoId.startsWith('au_') ? 'audius' : 'youtube'),
+    isPreview: this.isPreview || (this.videoId && this.videoId.startsWith('dz_')),
   };
 };
 

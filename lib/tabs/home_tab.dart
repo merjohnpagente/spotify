@@ -119,6 +119,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                           title: song.title,
                           artist: song.artist,
                           imageUrl: song.thumbnailUrl,
+                          isPreview: song.isPreview,
                           onPlay: () => _playSong(context, songs, index),
                           onTap: () => _playSong(context, songs, index),
                         );
@@ -164,6 +165,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                                 title: song.title,
                                 artist: song.artist,
                                 imageUrl: song.thumbnailUrl,
+                                isPreview: song.isPreview,
                                 onPlay: () => _playSong(context, songs, index),
                                 onTap: () => _playSong(context, songs, index),
                               ),

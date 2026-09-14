@@ -22,6 +22,7 @@ const mapDeezerTrack = (t) => {
     explicit: Boolean(t.explicit_lyrics),
     source: 'deezer',
     previewUrl: t.preview || null, // 30s mp3, CORS allowed
+    isPreview: true, // Deezer free API is always 30s preview — flag for UI badge
   };
 };
 

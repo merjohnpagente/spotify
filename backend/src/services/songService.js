@@ -26,13 +26,16 @@ const CACHE_TTL = {
 // Persist a YouTube song in MongoDB; if the DB is unavailable, degrade
 // gracefully and serve the YouTube data directly so music keeps playing.
 const upsertSong = async (ytData) => {
+  const publicData = {
+    id: null,
+    isAvailable: true,
+    addedToSystemAt: new Date(),
+    source: ytData.source || (ytData.videoId && ytData.videoId.startsWith('dz_') ? 'deezer' : ytData.videoId && ytData.videoId.startsWith('au_') ? 'audius' : 'youtube'),
+    isPreview: ytData.isPreview ?? (ytData.videoId && ytData.videoId.startsWith('dz_')),
+    ...ytData,
+  };
   if (!isDbReady()) {
-    return {
-      id: null,
-      isAvailable: true,
-      addedToSystemAt: new Date(),
-      ...ytData,
-    };
+    return publicData;
   }
   try {
     let song = await Song.findOne({ videoId: ytData.videoId });
@@ -42,12 +45,7 @@ const upsertSong = async (ytData) => {
     return song.toPublicJSON();
   } catch (dbError) {
     console.warn('MongoDB unavailable, serving song without caching:', dbError.message);
-    return {
-      id: null,
-      isAvailable: true,
-      addedToSystemAt: new Date(),
-      ...ytData,
-    };
+    return publicData;
   }
 };
 
@@ -108,15 +106,21 @@ const searchSongsService = async (query, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  // Hybrid: Deezer first (major catalog, no bot block, <800ms), then Audius, then YouTube fallback
+  // Hybrid: Audius + YouTube first (FULL tracks), Deezer last (30s previews) — fixes "only seconds"
   let results = [];
   try {
-    const [deezerResults, audiusResults] = await Promise.all([
+    const [audiusResults, deezerResults] = await Promise.all([
+      audiusService.searchSongs(query, limit).catch(() => []),
       deezerService.searchSongs(query, limit).catch(() => []),
-      audiusService.searchSongs(query, Math.ceil(limit/2)).catch(() => []),
     ]);
+    // Also fetch YouTube in parallel when limit not yet filled quickly
+    let ytResults = [];
+    try {
+      ytResults = await youtubeService.searchSongs(query, limit).catch(() => []);
+    } catch (_) { /* ignore */ }
     const seen = new Set();
-    for (const bucket of [deezerResults, audiusResults]) {
+    // Priority: Audius full > YouTube full > Deezer preview
+    for (const bucket of [audiusResults, ytResults, deezerResults]) {
       for (const s of bucket) {
         if (!seen.has(s.videoId) && results.length < limit) {
           seen.add(s.videoId);
@@ -125,6 +129,7 @@ const searchSongsService = async (query, limit = 20) => {
       }
     }
   } catch (_) { /* ignore */ }
+  // If still thin, try YouTube again as last resort
   if (results.length < Math.min(limit, 5)) {
     try {
       const ytResults = await youtubeService.searchSongs(query, limit);
@@ -148,12 +153,16 @@ const getTrendingSongsService = async (limit = 30) => {
 
   let results = [];
   try {
-    const [deezerTrending, audiusTrending] = await Promise.all([
+    const [audiusTrending, deezerTrending] = await Promise.all([
+      audiusService.getTrendingSongs(limit).catch(() => []),
       deezerService.getTrendingSongs(limit).catch(() => []),
-      audiusService.getTrendingSongs(Math.ceil(limit/2)).catch(() => []),
     ]);
+    let ytResults = [];
+    try {
+      ytResults = await youtubeService.getTrendingSongs(limit).catch(() => []);
+    } catch (_) { /* ignore */ }
     const seen = new Set();
-    for (const bucket of [deezerTrending, audiusTrending]) {
+    for (const bucket of [audiusTrending, ytResults, deezerTrending]) {
       for (const s of bucket) {
         if (!seen.has(s.videoId) && results.length < limit) {
           seen.add(s.videoId);
@@ -236,8 +245,20 @@ const getSongsByGenre = async (genre, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  let results = await deezerService.searchSongs(`${genre} music`, limit);
-  if (!results.length) results = await youtubeService.searchByGenre(genre, limit);
+  let results = [];
+  try {
+    const [audiusResults, deezerResults] = await Promise.all([
+      audiusService.searchSongs(`${genre} music`, limit).catch(() => []),
+      deezerService.searchSongs(`${genre} music`, limit).catch(() => []),
+    ]);
+    let ytResults = [];
+    try { ytResults = await youtubeService.searchByGenre(genre, limit).catch(() => []); } catch (_) {}
+    const seen = new Set();
+    for (const bucket of [audiusResults, ytResults, deezerResults]) {
+      for (const s of bucket) if (!seen.has(s.videoId) && results.length < limit) { seen.add(s.videoId); results.push(s); }
+    }
+  } catch (_) { results = []; }
+  if (!results.length) results = await youtubeService.searchByGenre(genre, limit).catch(() => []);
   
   const songs = await Promise.all(results.map(r => upsertSong(r)));
 

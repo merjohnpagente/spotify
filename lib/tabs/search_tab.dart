@@ -234,6 +234,7 @@ class _SearchTabState extends ConsumerState<SearchTab> {
                         title: entry.value.title,
                         artist: entry.value.artist,
                         imageUrl: entry.value.thumbnailUrl,
+                        isPreview: entry.value.isPreview,
                         onPlay: () => _playSong(context, songs, entry.key),
                         onTap: () => _playSong(context, songs, entry.key),
                       )),

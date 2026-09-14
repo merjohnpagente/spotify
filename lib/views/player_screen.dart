@@ -156,6 +156,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 24),
+                      if (song?.isPreview == true)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+                          ),
+                          child: const Text(
+                            'PREVIEW 30s — full track not available',
+                            style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      if (song?.isPreview == true) const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

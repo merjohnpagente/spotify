@@ -12,6 +12,7 @@ class WebAudioService {
   ];
 
   Future<String?> getAudioUrl(String videoId, {Duration timeout = const Duration(seconds: 8)}) async {
+    if (videoId.startsWith('dz_') || videoId.startsWith('au_')) return null;
     // Primary: Invidious via allorigins raw (bypasses CORS, no API key needed)
     var url = await _tryInvidiousViaAllOrigins(videoId, timeout);
     if (url != null) return url;

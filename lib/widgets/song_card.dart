@@ -7,6 +7,7 @@ class SongCard extends StatefulWidget {
   final String imageUrl;
   final VoidCallback? onPlay;
   final VoidCallback? onTap;
+  final bool isPreview;
 
   const SongCard({
     super.key,
@@ -15,6 +16,7 @@ class SongCard extends StatefulWidget {
     required this.imageUrl,
     this.onPlay,
     this.onTap,
+    this.isPreview = false,
   });
 
   @override
@@ -131,6 +133,19 @@ class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
+              if (widget.isPreview)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'PREVIEW 30s',
+                    style: TextStyle(color: Colors.orange, fontSize: 9, fontWeight: FontWeight.bold),
+                  ),
+                ),
             ],
           ),
         ),

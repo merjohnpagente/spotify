@@ -129,12 +129,7 @@ const extractAudioUrl = async (videoId) => {
     }
   }
   if (videoId.startsWith('dz_')) {
-    const dzUrl = await deezerService.getPreviewUrl(videoId);
-    if (dzUrl) {
-      await cacheSet(cacheKey, { url: dzUrl }, AUDIO_CACHE_TTL);
-      return dzUrl;
-    }
-    // Deezer track without preview: try Audius search for same title+artist
+    // Fix 30s-only: try FULL track first (Audius) before falling back to Deezer 30s preview
     try {
       const dzSong = await deezerService.getSongById(videoId);
       if (dzSong) {
@@ -148,6 +143,11 @@ const extractAudioUrl = async (videoId) => {
         }
       }
     } catch (_) { /* ignore */ }
+    const dzUrl = await deezerService.getPreviewUrl(videoId);
+    if (dzUrl) {
+      await cacheSet(cacheKey, { url: dzUrl }, AUDIO_CACHE_TTL);
+      return dzUrl;
+    }
   }
 
   // MongoDB read is best-effort: if the DB is unavailable we still
