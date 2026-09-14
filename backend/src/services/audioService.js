@@ -129,21 +129,33 @@ const extractAudioUrl = async (videoId) => {
     }
   }
   if (videoId.startsWith('dz_')) {
-    // Fix 30s-only: try FULL track first (Audius) before falling back to Deezer 30s preview
-    try {
-      const dzSong = await deezerService.getSongById(videoId);
-      if (dzSong) {
-        const auSearch = await audiusService.searchSongs(`${dzSong.title} ${dzSong.artist}`, 3);
-        if (auSearch.length) {
-          const auUrl = await audiusService.getStreamUrl(auSearch[0].videoId);
-          if (auUrl) {
-            await cacheSet(cacheKey, { url: auUrl }, AUDIO_CACHE_TTL);
-            return auUrl;
-          }
-        }
-      }
-    } catch (_) { /* ignore */ }
-    const dzUrl = await deezerService.getPreviewUrl(videoId);
+    // Fast parallel: Audius full-track race vs 30s preview — don't block preview >2.5s
+    const previewPromise = deezerService.getPreviewUrl(videoId).catch(() => null);
+    const audiusPromise = (async () => {
+      try {
+        const dzSong = await Promise.race([
+          deezerService.getSongById(videoId),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('dz timeout')), 2500)),
+        ]);
+        if (!dzSong) return null;
+        const auSearch = await Promise.race([
+          audiusService.searchSongs(`${dzSong.title} ${dzSong.artist}`, 3),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('au search timeout')), 2500)),
+        ]);
+        if (!auSearch || !auSearch.length) return null;
+        const auUrl = await Promise.race([
+          audiusService.getStreamUrl(auSearch[0].videoId),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('au stream timeout')), 2500)),
+        ]);
+        return auUrl || null;
+      } catch (_) { return null; }
+    })();
+    const auUrl = await audiusPromise;
+    if (auUrl) {
+      await cacheSet(cacheKey, { url: auUrl }, AUDIO_CACHE_TTL);
+      return auUrl;
+    }
+    const dzUrl = await previewPromise;
     if (dzUrl) {
       await cacheSet(cacheKey, { url: dzUrl }, AUDIO_CACHE_TTL);
       return dzUrl;

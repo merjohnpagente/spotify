@@ -106,21 +106,15 @@ const searchSongsService = async (query, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  // Hybrid: Audius + YouTube first (FULL tracks), Deezer last (30s previews) — fixes "only seconds"
+  // Hybrid FAST: Audius+Deezer parallel (800ms), only YouTube if still thin — fixes "dugay loading"
   let results = [];
   try {
     const [audiusResults, deezerResults] = await Promise.all([
       audiusService.searchSongs(query, limit).catch(() => []),
       deezerService.searchSongs(query, limit).catch(() => []),
     ]);
-    // Also fetch YouTube in parallel when limit not yet filled quickly
-    let ytResults = [];
-    try {
-      ytResults = await youtubeService.searchSongs(query, limit).catch(() => []);
-    } catch (_) { /* ignore */ }
     const seen = new Set();
-    // Priority: Audius full > YouTube full > Deezer preview
-    for (const bucket of [audiusResults, ytResults, deezerResults]) {
+    for (const bucket of [audiusResults, deezerResults]) {
       for (const s of bucket) {
         if (!seen.has(s.videoId) && results.length < limit) {
           seen.add(s.videoId);
@@ -128,17 +122,20 @@ const searchSongsService = async (query, limit = 20) => {
         }
       }
     }
+    // Only call slow YouTube yt-dlp if still thin (<5 results) — with 4s timeout so search never blocks
+    if (results.length < Math.min(limit, 5)) {
+      try {
+        const ytResults = await Promise.race([
+          youtubeService.searchSongs(query, limit),
+          new Promise((res) => setTimeout(() => res([]), 4000)),
+        ]);
+        const ytSeen = new Set(results.map(r => r.videoId));
+        for (const s of (ytResults || [])) {
+          if (!ytSeen.has(s.videoId) && results.length < limit) results.push(s);
+        }
+      } catch (_) { /* ignore */ }
+    }
   } catch (_) { /* ignore */ }
-  // If still thin, try YouTube again as last resort
-  if (results.length < Math.min(limit, 5)) {
-    try {
-      const ytResults = await youtubeService.searchSongs(query, limit);
-      const seen = new Set(results.map(r => r.videoId));
-      for (const s of ytResults) {
-        if (!seen.has(s.videoId) && results.length < limit) results.push(s);
-      }
-    } catch (_) { /* ignore */ }
-  }
 
   const songs = await Promise.all(results.map(r => upsertSong(r)));
 
@@ -157,12 +154,8 @@ const getTrendingSongsService = async (limit = 30) => {
       audiusService.getTrendingSongs(limit).catch(() => []),
       deezerService.getTrendingSongs(limit).catch(() => []),
     ]);
-    let ytResults = [];
-    try {
-      ytResults = await youtubeService.getTrendingSongs(limit).catch(() => []);
-    } catch (_) { /* ignore */ }
     const seen = new Set();
-    for (const bucket of [audiusTrending, ytResults, deezerTrending]) {
+    for (const bucket of [audiusTrending, deezerTrending]) {
       for (const s of bucket) {
         if (!seen.has(s.videoId) && results.length < limit) {
           seen.add(s.videoId);
@@ -170,14 +163,17 @@ const getTrendingSongsService = async (limit = 30) => {
         }
       }
     }
+    if (results.length < Math.min(limit, 10)) {
+      try {
+        const ytResults = await Promise.race([
+          youtubeService.getTrendingSongs(limit),
+          new Promise((res) => setTimeout(() => res([]), 4000)),
+        ]);
+        const ytSeen = new Set(results.map(r => r.videoId));
+        for (const s of (ytResults || [])) if (!ytSeen.has(s.videoId) && results.length < limit) results.push(s);
+      } catch (_) { /* ignore */ }
+    }
   } catch (_) { /* ignore */ }
-  if (results.length < Math.min(limit, 10)) {
-    try {
-      const ytResults = await youtubeService.getTrendingSongs(limit);
-      const seen = new Set(results.map(r => r.videoId));
-      for (const s of ytResults) if (!seen.has(s.videoId) && results.length < limit) results.push(s);
-    } catch (_) { /* ignore */ }
-  }
 
   const songs = await Promise.all(results.map(r => upsertSong(r)));
 
@@ -251,14 +247,20 @@ const getSongsByGenre = async (genre, limit = 20) => {
       audiusService.searchSongs(`${genre} music`, limit).catch(() => []),
       deezerService.searchSongs(`${genre} music`, limit).catch(() => []),
     ]);
-    let ytResults = [];
-    try { ytResults = await youtubeService.searchByGenre(genre, limit).catch(() => []); } catch (_) {}
     const seen = new Set();
-    for (const bucket of [audiusResults, ytResults, deezerResults]) {
+    for (const bucket of [audiusResults, deezerResults]) {
       for (const s of bucket) if (!seen.has(s.videoId) && results.length < limit) { seen.add(s.videoId); results.push(s); }
     }
+    if (!results.length) {
+      try {
+        results = await Promise.race([
+          youtubeService.searchByGenre(genre, limit),
+          new Promise((res) => setTimeout(() => res([]), 4000)),
+        ]);
+      } catch (_) { results = []; }
+    }
   } catch (_) { results = []; }
-  if (!results.length) results = await youtubeService.searchByGenre(genre, limit).catch(() => []);
+  if (!results.length) results = await Promise.race([youtubeService.searchByGenre(genre, limit), new Promise((res) => setTimeout(() => res([]), 4000))]).catch(() => []);
   
   const songs = await Promise.all(results.map(r => upsertSong(r)));
 
