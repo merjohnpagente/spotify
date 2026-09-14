@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": "if [ ! -d flutter ]; then curl -Lo flutter.tar.xz https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.24.5-stable.tar.xz && tar xf flutter.tar.xz; fi && export PATH=\"$PATH:$PWD/flutter/bin\" && flutter --version && flutter pub get && flutter build web --release --dart-define=API_BASE_URL=${API_BASE_URL}",
+  "outputDirectory": "build/web",
+  "installCommand": "echo 'skip install'",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
