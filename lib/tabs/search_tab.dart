@@ -290,10 +290,12 @@ class _SearchTabState extends ConsumerState<SearchTab> {
                 ),
                 if (isNetworkError) ...[
                   const SizedBox(height: 8),
-                  const Text(
-                    'Please check your connection and try again. The server may be waking up — wait a moment and retry.',
+                  Text(
+                    // Surface ApiException(0) message: includes baseUrl and the
+                    // --dart-define=API_BASE_URL hint for physical devices.
+                    e.toString(),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+                    style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
                   ),
                 ] else ...[
                   const SizedBox(height: 8),

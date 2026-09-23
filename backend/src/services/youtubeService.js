@@ -418,4 +418,7 @@ module.exports = {
   runYtDlp,
   diagnose,
   YTDLP_BIN,
+  // Exported for unit tests (M5) — pure formatters, no side effects.
+  formatFlatEntry,
+  formatVideoDetail,
 };

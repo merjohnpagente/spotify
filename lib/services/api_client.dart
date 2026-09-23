@@ -102,7 +102,10 @@ class ApiClient {
           return _send(method, path,
               body: body, auth: auth, retried: retried, networkRetry: true);
         }
-        throw ApiException(0, 'Cannot reach server ($baseUrl). Is the backend running?');
+        throw ApiException(
+            0,
+            'Cannot reach server ($baseUrl). Is the backend running? '
+            'On a physical device, run with --dart-define=API_BASE_URL=http://<your-PC-LAN-IP>:3000');
       }
       rethrow;
     }
