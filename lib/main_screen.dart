@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:spotify_fy/providers/player_provider.dart';
 import 'package:spotify_fy/services/update_service.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/utils/scroll_registry.dart';
 import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/tabs/home_tab.dart';
 import 'package:spotify_fy/tabs/search_tab.dart';
@@ -54,6 +55,11 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
   }
 
   void _onTabTapped(int index) {
+    if (index == _currentIndex) {
+      // Re-tapping the active tab scrolls it back to the top.
+      ScrollRegistry.scrollToTop(index);
+      return;
+    }
     setState(() {
       _currentIndex = index;
     });
@@ -270,6 +276,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
               children: [
                 IconButton(
                   icon: const Icon(Icons.skip_previous, color: SpotifyColors.textPrimary, size: 24),
+                  tooltip: 'Previous',
                   onPressed: controller.previous,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -278,35 +285,41 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
                 Material(
                   color: Colors.transparent,
                   shape: const CircleBorder(),
-                  child: InkWell(
-                    onTap: controller.togglePlayPause,
-                    customBorder: const CircleBorder(),
-                    child: Ink(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        color: SpotifyColors.primaryAccent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: player.loading
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
+                  child: Semantics(
+                    button: true,
+                    toggled: player.isPlaying,
+                    label: player.isPlaying ? 'Pause' : 'Play',
+                    child: InkWell(
+                      onTap: controller.togglePlayPause,
+                      customBorder: const CircleBorder(),
+                      child: Ink(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(
+                          color: SpotifyColors.primaryAccent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: player.loading
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: SpotifyColors.textPrimary,
+                                ),
+                              )
+                            : Icon(
+                                player.isPlaying ? Icons.pause : Icons.play_arrow,
                                 color: SpotifyColors.textPrimary,
+                                size: 24,
                               ),
-                            )
-                          : Icon(
-                              player.isPlaying ? Icons.pause : Icons.play_arrow,
-                              color: SpotifyColors.textPrimary,
-                              size: 24,
-                            ),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.skip_next, color: SpotifyColors.textPrimary, size: 24),
+                  tooltip: 'Next',
                   onPressed: controller.next,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),

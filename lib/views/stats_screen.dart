@@ -5,6 +5,7 @@ import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
+import 'package:spotify_fy/utils/route_transitions.dart';
 import 'package:spotify_fy/views/artist_screen.dart';
 import 'package:spotify_fy/views/genre_songs_screen.dart';
 import 'package:spotify_fy/widgets/search_result_card.dart';
@@ -25,7 +26,7 @@ class StatsScreen extends ConsumerWidget {
           'Listening Stats',
           style: TextStyle(
             color: SpotifyColors.textPrimary,
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -114,12 +115,7 @@ class StatsScreen extends ConsumerWidget {
                 return _Chip(
                   label: name,
                   sub: '$count plays',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => GenreSongsScreen(genre: name),
-                    ),
-                  ),
+                  onTap: () => pushFade(context, GenreSongsScreen(genre: name)),
                 );
               }).toList(),
             ),
@@ -148,10 +144,7 @@ class StatsScreen extends ConsumerWidget {
                   rank: index + 1,
                   name: name,
                   sub: '$count plays',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => ArtistScreen(artist: name)),
-                  ),
+                  onTap: () => pushFade(context, ArtistScreen(artist: name)),
                 );
               },
             ),

@@ -7,6 +7,7 @@ import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
 import 'package:spotify_fy/widgets/search_result_card.dart';
+import 'package:spotify_fy/widgets/shimmer.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -24,7 +25,7 @@ class HistoryScreen extends ConsumerWidget {
           'Listening History',
           style: TextStyle(
             color: SpotifyColors.textPrimary,
-            fontSize: 20,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -34,6 +35,7 @@ class HistoryScreen extends ConsumerWidget {
                 ? const SizedBox.shrink()
                 : IconButton(
                     icon: const Icon(Icons.delete_outline, color: SpotifyColors.textSecondary),
+                    tooltip: 'Clear history',
                     onPressed: () => _confirmClear(context, ref),
                   ),
             orElse: () => const SizedBox.shrink(),
@@ -61,13 +63,25 @@ class HistoryScreen extends ConsumerWidget {
                       )),
                 ],
               ),
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: SpotifyColors.primaryAccent),
-        ),
+        loading: () => const ShimmerList(count: 8),
         error: (e, _) => Center(
-          child: Text(
-            'Could not load history',
-            style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Could not load history',
+                style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => ref.invalidate(listeningHistoryProvider),
+                icon: const Icon(Icons.refresh, color: SpotifyColors.primaryAccent, size: 18),
+                label: const Text(
+                  'Retry',
+                  style: TextStyle(color: SpotifyColors.primaryAccent),
+                ),
+              ),
+            ],
           ),
         ),
       ),

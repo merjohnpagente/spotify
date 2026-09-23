@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/providers/providers.dart';
+import 'package:spotify_fy/utils/route_transitions.dart';
+import 'package:spotify_fy/utils/scroll_registry.dart';
 import 'package:spotify_fy/views/history_screen.dart';
 import 'package:spotify_fy/views/settings_screen.dart';
 import 'package:spotify_fy/views/stats_screen.dart';
@@ -16,6 +18,8 @@ class ProfileTab extends ConsumerStatefulWidget {
 }
 
 class _ProfileTabState extends ConsumerState<ProfileTab> {
+  final ScrollController _scrollController = ScrollController();
+
   static const Map<String, String> _qualityLabels = {
     'low': 'Low',
     'medium': 'Medium',
@@ -32,6 +36,19 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     'ja': 'Japanese',
     'ko': 'Korean',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    ScrollRegistry.register(3, _scrollController);
+  }
+
+  @override
+  void dispose() {
+    ScrollRegistry.unregister(3);
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +75,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
         ),
       ),
       body: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(24),
         children: [
           Center(
@@ -231,34 +249,19 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.history,
             title: 'Recent Songs',
             trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              );
-            },
+            onTap: () => pushFade(context, const HistoryScreen()),
           ),
           _buildSettingTile(
             icon: Icons.insights_outlined,
             title: 'Listening Stats',
             trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const StatsScreen()),
-              );
-            },
+            onTap: () => pushFade(context, const StatsScreen()),
           ),
           _buildSettingTile(
             icon: Icons.settings_outlined,
             title: 'Settings',
             trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
+            onTap: () => pushFade(context, const SettingsScreen()),
           ),
           const SizedBox(height: 32),
           const Text(

@@ -6,6 +6,7 @@ import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
 import 'package:spotify_fy/widgets/search_result_card.dart';
+import 'package:spotify_fy/widgets/shimmer.dart';
 
 class ArtistScreen extends ConsumerWidget {
   const ArtistScreen({super.key, required this.artist});
@@ -32,7 +33,7 @@ class ArtistScreen extends ConsumerWidget {
               artist,
               style: const TextStyle(
                 color: SpotifyColors.textPrimary,
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
               maxLines: 1,
@@ -184,17 +185,36 @@ class ArtistScreen extends ConsumerWidget {
               ],
             ),
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: CircularProgressIndicator(color: SpotifyColors.primaryAccent),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Column(
+          children: [
+            ShimmerTile(),
+            ShimmerTile(),
+            ShimmerTile(),
+            ShimmerTile(),
+          ],
         ),
       ),
-      error: (e, _) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
         child: Center(
-          child: Text(
-            'Could not load artist',
-            style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Could not load artist',
+                style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => ref.invalidate(searchResultsProvider(artist)),
+                icon: const Icon(Icons.refresh, color: SpotifyColors.primaryAccent, size: 18),
+                label: const Text(
+                  'Retry',
+                  style: TextStyle(color: SpotifyColors.primaryAccent),
+                ),
+              ),
+            ],
           ),
         ),
       ),

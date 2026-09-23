@@ -78,11 +78,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 floating: true,
                 leading: IconButton(
                   icon: const Icon(Icons.keyboard_arrow_down, color: SpotifyColors.textPrimary, size: 28),
+                  tooltip: 'Minimize player',
                   onPressed: () => Navigator.pop(context),
                 ),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.more_vert, color: SpotifyColors.textPrimary, size: 28),
+                    tooltip: 'More options',
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('More options — coming soon')),
@@ -184,15 +186,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          GestureDetector(
-                            onTap: player.currentSong == null ? null : controller.toggleLike,
-                            child: AnimatedScale(
-                              scale: player.isLiked ? 1.2 : 1.0,
-                              duration: const Duration(milliseconds: 200),
-                              child: Icon(
-                                player.isLiked ? Icons.favorite : Icons.favorite_border,
-                                color: player.isLiked ? const Color(0xFFE91E63) : SpotifyColors.textSecondary,
-                                size: 28,
+                          Semantics(
+                            button: true,
+                            toggled: player.isLiked,
+                            label: player.isLiked ? 'Unlike song' : 'Like song',
+                            child: GestureDetector(
+                              onTap: player.currentSong == null ? null : controller.toggleLike,
+                              child: AnimatedScale(
+                                scale: player.isLiked ? 1.2 : 1.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  player.isLiked ? Icons.favorite : Icons.favorite_border,
+                                  color: player.isLiked ? const Color(0xFFE91E63) : SpotifyColors.textSecondary,
+                                  size: 28,
+                                ),
                               ),
                             ),
                           ),
@@ -211,29 +218,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               overlayColor: SpotifyColors.primaryAccent.withValues(alpha: 0.2),
                               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                             ),
-                            child: Slider(
-                              value: _sliderValue(player),
-                              min: 0,
-                              max: player.duration.inMilliseconds > 0
-                                  ? player.duration.inMilliseconds.toDouble()
-                                  : 1,
-                              onChangeStart: (_) {
-                                setState(() {
-                                  _isDragging = true;
-                                  _dragPosition = _sliderValue(player);
-                                });
-                              },
-                              onChanged: (value) {
-                                setState(() {
-                                  _dragPosition = value;
-                                });
-                              },
-                              onChangeEnd: (value) {
-                                controller.seek(Duration(milliseconds: value.round()));
-                                setState(() {
-                                  _isDragging = false;
-                                });
-                              },
+                            child: Semantics(
+                              label: 'Playback position',
+                              slider: true,
+                              child: Slider(
+                                value: _sliderValue(player),
+                                min: 0,
+                                max: player.duration.inMilliseconds > 0
+                                    ? player.duration.inMilliseconds.toDouble()
+                                    : 1,
+                                onChangeStart: (_) {
+                                  setState(() {
+                                    _isDragging = true;
+                                    _dragPosition = _sliderValue(player);
+                                  });
+                                },
+                                onChanged: (value) {
+                                  setState(() {
+                                    _dragPosition = value;
+                                  });
+                                },
+                                onChangeEnd: (value) {
+                                  controller.seek(Duration(milliseconds: value.round()));
+                                  setState(() {
+                                    _isDragging = false;
+                                  });
+                                },
+                              ),
                             ),
                           ),
                           Padding(
@@ -290,6 +301,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             isActive: player.shuffle,
                             onTap: controller.toggleShuffle,
                             size: 24,
+                            semanticsLabel: 'Shuffle',
                           ),
                           _buildControlButton(
                             icon: Icons.skip_previous,
@@ -297,6 +309,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             onTap: player.currentSong == null ? null : controller.previous,
                             size: 28,
                             background: true,
+                            semanticsLabel: 'Previous track',
                           ),
                           _buildPlayPauseButton(player, controller),
                           _buildControlButton(
@@ -305,12 +318,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             onTap: player.currentSong == null ? null : controller.next,
                             size: 28,
                             background: true,
+                            semanticsLabel: 'Next track',
                           ),
                           _buildControlButton(
                             icon: player.repeatMode == RepeatMode.one ? Icons.repeat_one : Icons.repeat,
                             isActive: player.repeatMode != RepeatMode.off,
                             onTap: controller.toggleRepeat,
                             size: 24,
+                            semanticsLabel: 'Repeat mode',
                           ),
                         ],
                       ),
@@ -330,12 +345,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                                 overlayColor: SpotifyColors.primaryAccent.withValues(alpha: 0.2),
                                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                               ),
+                            child: Semantics(
+                              label: 'Volume',
+                              slider: true,
                               child: Slider(
                                 value: player.volume,
                                 min: 0,
                                 max: 1,
                                 onChanged: controller.setVolume,
                               ),
+                            ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -402,32 +421,38 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     required VoidCallback? onTap,
     required double size,
     bool background = false,
+    String? semanticsLabel,
   }) {
     final dim = background ? 56.0 : 48.0;
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: Ink(
-          width: dim,
-          height: dim,
-          decoration: background
-              ? const BoxDecoration(
-                  color: SpotifyColors.cardBackground,
-                  shape: BoxShape.circle,
-                )
-              : null,
-          child: Center(
-            child: Icon(
-              icon,
-              color: onTap == null
-                  ? SpotifyColors.textSecondary.withValues(alpha: 0.4)
-                  : isActive
-                      ? SpotifyColors.primaryAccent
-                      : SpotifyColors.textPrimary,
-              size: size,
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      enabled: onTap != null,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Ink(
+            width: dim,
+            height: dim,
+            decoration: background
+                ? const BoxDecoration(
+                    color: SpotifyColors.cardBackground,
+                    shape: BoxShape.circle,
+                  )
+                : null,
+            child: Center(
+              child: Icon(
+                icon,
+                color: onTap == null
+                    ? SpotifyColors.textSecondary.withValues(alpha: 0.4)
+                    : isActive
+                        ? SpotifyColors.primaryAccent
+                        : SpotifyColors.textPrimary,
+                size: size,
+              ),
             ),
           ),
         ),
@@ -437,41 +462,51 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   Widget _buildPlayPauseButton(PlayerState player, PlayerController controller) {
     final disabled = player.loading || player.currentSong == null;
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: disabled ? null : controller.togglePlayPause,
-        customBorder: const CircleBorder(),
-        child: Ink(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: disabled
-                ? SpotifyColors.primaryAccent.withValues(alpha: 0.5)
-                : SpotifyColors.primaryAccent,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
-                blurRadius: 20,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          child: player.loading
-              ? const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    color: SpotifyColors.textPrimary,
-                  ),
-                )
-              : Icon(
-                  player.isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: SpotifyColors.textPrimary,
-                  size: 28,
+    return Semantics(
+      button: true,
+      toggled: player.isPlaying,
+      enabled: !disabled,
+      label: player.loading
+          ? 'Loading'
+          : player.isPlaying
+              ? 'Pause'
+              : 'Play',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: disabled ? null : controller.togglePlayPause,
+          customBorder: const CircleBorder(),
+          child: Ink(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: disabled
+                  ? SpotifyColors.primaryAccent.withValues(alpha: 0.5)
+                  : SpotifyColors.primaryAccent,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
+                  blurRadius: 20,
+                  spreadRadius: 5,
                 ),
+              ],
+            ),
+            child: player.loading
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: SpotifyColors.textPrimary,
+                    ),
+                  )
+                : Icon(
+                    player.isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: SpotifyColors.textPrimary,
+                    size: 28,
+                  ),
+          ),
         ),
       ),
     );

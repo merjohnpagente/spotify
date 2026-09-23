@@ -5,16 +5,39 @@ import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/services/playlist_service.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/utils/route_transitions.dart';
+import 'package:spotify_fy/utils/scroll_registry.dart';
 import 'package:spotify_fy/views/liked_songs_screen.dart';
 import 'package:spotify_fy/views/playlist_detail_screen.dart';
 import 'package:spotify_fy/widgets/library_item.dart';
 import 'package:spotify_fy/widgets/playlist_item.dart';
+import 'package:spotify_fy/widgets/shimmer.dart';
 
-class LibraryTab extends ConsumerWidget {
+class LibraryTab extends ConsumerStatefulWidget {
   const LibraryTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryTab> createState() => _LibraryTabState();
+}
+
+class _LibraryTabState extends ConsumerState<LibraryTab> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    ScrollRegistry.register(2, _scrollController);
+  }
+
+  @override
+  void dispose() {
+    ScrollRegistry.unregister(2);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final liked = ref.watch(likedSongsProvider);
     final playlists = ref.watch(myPlaylistsProvider);
     final playlistService = ref.watch(playlistServiceProvider);
@@ -39,6 +62,7 @@ class LibraryTab extends ConsumerWidget {
               color: SpotifyColors.textPrimary,
               size: 28,
             ),
+            tooltip: 'Create playlist',
             onPressed: () => _createPlaylist(context, ref, playlistService),
           ),
         ],
@@ -51,6 +75,7 @@ class LibraryTab extends ConsumerWidget {
         color: SpotifyColors.primaryAccent,
         backgroundColor: SpotifyColors.cardBackground,
         child: ListView(
+          controller: _scrollController,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           children: [
             LibraryItem(
@@ -61,14 +86,7 @@ class LibraryTab extends ConsumerWidget {
                 orElse: () => 'Songs',
               ),
               iconColor: const Color(0xFFE91E63),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LikedSongsScreen(),
-                  ),
-                );
-              },
+              onTap: () => pushFade(context, const LikedSongsScreen()),
             ),
             LibraryItem(
               icon: Icons.download,
@@ -116,24 +134,22 @@ class LibraryTab extends ConsumerWidget {
                               ? playlist.songs.length
                               : playlist.songIds.length,
                           onTap: () {
-                            Navigator.push(
+                            pushFade(
                               context,
-                              MaterialPageRoute(
-                                builder: (context) => PlaylistDetailScreen(
-                                  playlistId: playlist.id,
-                                ),
-                              ),
+                              PlaylistDetailScreen(playlistId: playlist.id),
                             );
                           },
                         );
                       },
                     ),
               loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: SpotifyColors.primaryAccent,
-                  ),
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    ShimmerTile(imageSize: 48),
+                    ShimmerTile(imageSize: 48),
+                    ShimmerTile(imageSize: 48),
+                  ],
                 ),
               ),
               error: (e, _) => Padding(

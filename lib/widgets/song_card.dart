@@ -99,31 +99,36 @@ class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin
                   Positioned(
                     bottom: 12,
                     right: 12,
-                    child: Material(
-                      color: Colors.transparent,
-                      shape: const CircleBorder(),
-                      elevation: 4,
-                      child: InkWell(
-                        onTap: widget.onPlay,
-                        customBorder: const CircleBorder(),
-                        child: Ink(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: SpotifyColors.primaryAccent,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.play_arrow,
-                            color: SpotifyColors.textPrimary,
-                            size: 24,
+                    child: Semantics(
+                      button: true,
+                      label: 'Play ${widget.title} by ${widget.artist}',
+                      child: Material(
+                        color: Colors.transparent,
+                        shape: const CircleBorder(),
+                        elevation: 4,
+                        child: InkWell(
+                          onTap: widget.onPlay,
+                          customBorder: const CircleBorder(),
+                          child: Ink(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: SpotifyColors.primaryAccent,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow,
+                              color: SpotifyColors.textPrimary,
+                              size: 24,
+                              semanticLabel: 'Play',
+                            ),
                           ),
                         ),
                       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/utils/route_transitions.dart';
 import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/views/stats_screen.dart';
 
@@ -59,7 +60,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           'Settings',
           style: TextStyle(
             color: SpotifyColors.textPrimary,
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -149,10 +150,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             icon: Icons.insights_outlined,
             title: 'Listening Stats',
             subtitle: 'Genres, artists & top songs',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const StatsScreen()),
-            ),
+            onTap: () => pushFade(context, const StatsScreen()),
           ),
           const SizedBox(height: 24),
           const Text(

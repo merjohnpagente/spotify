@@ -9,10 +9,13 @@ import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
+import 'package:spotify_fy/utils/route_transitions.dart';
+import 'package:spotify_fy/utils/scroll_registry.dart';
 import 'package:spotify_fy/views/artist_screen.dart';
 import 'package:spotify_fy/views/genre_songs_screen.dart';
 import 'package:spotify_fy/widgets/genre_card.dart';
 import 'package:spotify_fy/widgets/search_result_card.dart';
+import 'package:spotify_fy/widgets/shimmer.dart';
 
 class SearchTab extends ConsumerStatefulWidget {
   const SearchTab({super.key});
@@ -24,6 +27,7 @@ class SearchTab extends ConsumerStatefulWidget {
 class _SearchTabState extends ConsumerState<SearchTab> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   Timer? _debounce;
   String _query = '';
 
@@ -42,14 +46,19 @@ class _SearchTabState extends ConsumerState<SearchTab> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(() => setState(() {}));
+    ScrollRegistry.register(1, _scrollController);
   }
+
+  /// Search view is shown when the field has focus or text — derived state,
+  /// so clearing the text reliably returns to the Browse grid.
+  bool get _isSearching =>
+      _searchController.text.isNotEmpty || _searchFocusNode.hasFocus;
 
   void _onSearchChanged() {
     _debounce?.cancel();
     final text = _searchController.text;
-    setState(() {
-      _isSearching = text.isNotEmpty;
-    });
+    setState(() {});
     if (text.trim().isEmpty) {
       setState(() => _query = '');
       return;
@@ -61,12 +70,13 @@ class _SearchTabState extends ConsumerState<SearchTab> {
     });
   }
 
-  bool _isSearching = false;
   String _searchTab = 'songs';
 
   @override
   void dispose() {
     _debounce?.cancel();
+    ScrollRegistry.unregister(1);
+    _scrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -77,12 +87,7 @@ class _SearchTabState extends ConsumerState<SearchTab> {
   }
 
   void _openGenre(String genre) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => GenreSongsScreen(genre: genre),
-      ),
-    );
+    pushFade(context, GenreSongsScreen(genre: genre));
   }
 
   @override
@@ -131,16 +136,18 @@ class _SearchTabState extends ConsumerState<SearchTab> {
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                onTap: () {
-                  setState(() {
-                    _isSearching = true;
-                  });
-                },
               ),
             ),
           ),
           Expanded(
-            child: _isSearching ? _buildSearchResults() : _buildBrowseAll(),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: _isSearching
+                  ? KeyedSubtree(key: const ValueKey('search'), child: _buildSearchResults())
+                  : KeyedSubtree(key: const ValueKey('browse'), child: _buildBrowseAll()),
+            ),
           ),
         ],
       ),
@@ -149,6 +156,7 @@ class _SearchTabState extends ConsumerState<SearchTab> {
 
   Widget _buildBrowseAll() {
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
         const Row(
@@ -243,8 +251,26 @@ class _SearchTabState extends ConsumerState<SearchTab> {
                   _buildArtistsList(songs),
               ],
             ),
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: SpotifyColors.primaryAccent),
+      loading: () => ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        physics: const NeverScrollableScrollPhysics(),
+        children: const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Top Results',
+              style: TextStyle(
+                color: SpotifyColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ShimmerTile(),
+          ShimmerTile(),
+          ShimmerTile(),
+          ShimmerTile(),
+        ],
       ),
       error: (e, _) {
         final msgLower = e.toString().toLowerCase();
@@ -356,10 +382,7 @@ class _SearchTabState extends ConsumerState<SearchTab> {
         ...artists.map((s) => _ArtistListTile(
               name: s.artist,
               imageUrl: s.thumbnailUrl,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ArtistScreen(artist: s.artist)),
-              ),
+              onTap: () => pushFade(context, ArtistScreen(artist: s.artist)),
             )),
       ],
     );

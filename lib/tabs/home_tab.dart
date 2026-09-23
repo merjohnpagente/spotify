@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
+import 'package:spotify_fy/utils/scroll_registry.dart';
 import 'package:spotify_fy/widgets/song_card.dart';
+import 'package:spotify_fy/widgets/shimmer.dart';
 
 class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({super.key});
@@ -17,11 +18,20 @@ class HomeTab extends ConsumerStatefulWidget {
 
 class _HomeTabState extends ConsumerState<HomeTab> {
   String _greeting = 'Good Evening';
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _updateGreeting();
+    ScrollRegistry.register(0, _scrollController);
+  }
+
+  @override
+  void dispose() {
+    ScrollRegistry.unregister(0);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _updateGreeting() {
@@ -36,9 +46,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
   }
 
   void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature — coming soon')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$feature — coming soon')));
   }
 
   void _playSong(BuildContext context, List<Song> queue, int index) {
@@ -62,11 +72,21 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: SpotifyColors.textPrimary, size: 28),
+            icon: const Icon(
+              Icons.notifications_none,
+              color: SpotifyColors.textPrimary,
+              size: 28,
+            ),
+            tooltip: 'Notifications',
             onPressed: () => _showComingSoon('Notifications'),
           ),
           IconButton(
-            icon: const Icon(Icons.settings, color: SpotifyColors.textPrimary, size: 28),
+            icon: const Icon(
+              Icons.settings,
+              color: SpotifyColors.textPrimary,
+              size: 28,
+            ),
+            tooltip: 'Settings',
             onPressed: () => _showComingSoon('Settings — see Profile tab'),
           ),
         ],
@@ -79,6 +99,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         color: SpotifyColors.primaryAccent,
         backgroundColor: SpotifyColors.cardBackground,
         child: ListView(
+          controller: _scrollController,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           children: [
             Text(
@@ -110,12 +131,13 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                   : GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 24,
-                        childAspectRatio: 0.75,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 24,
+                            childAspectRatio: 0.75,
+                          ),
                       itemCount: songs.length,
                       itemBuilder: (context, index) {
                         final song = songs[index];
@@ -162,7 +184,9 @@ class _HomeTabState extends ConsumerState<HomeTab> {
                         itemBuilder: (context, index) {
                           final song = songs[index];
                           return Padding(
-                            padding: EdgeInsets.only(right: index == songs.length - 1 ? 0 : 16),
+                            padding: EdgeInsets.only(
+                              right: index == songs.length - 1 ? 0 : 16,
+                            ),
                             child: SizedBox(
                               width: 150,
                               child: SongCard(
@@ -210,14 +234,16 @@ class SliverGridLoading extends StatelessWidget {
         ),
       );
     }
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 24,
-      childAspectRatio: 0.75,
-      children: cards,
+    return Shimmer(
+      child: GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 24,
+        childAspectRatio: 0.75,
+        children: cards,
+      ),
     );
   }
 }
@@ -229,16 +255,18 @@ class _RowLoading extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 220,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: 4,
-        itemBuilder: (context, index) => Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Container(
-            width: 150,
-            decoration: BoxDecoration(
-              color: SpotifyColors.cardBackground,
-              borderRadius: BorderRadius.circular(8),
+      child: Shimmer(
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: 4,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Container(
+              width: 150,
+              decoration: BoxDecoration(
+                color: SpotifyColors.cardBackground,
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ),
@@ -258,7 +286,10 @@ class _EmptySection extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Text(
         text,
-        style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+        style: const TextStyle(
+          color: SpotifyColors.textSecondary,
+          fontSize: 14,
+        ),
       ),
     );
   }
@@ -277,7 +308,8 @@ class _ErrorSection extends StatelessWidget {
 
   bool get _isNetworkError {
     if (error == null) return false;
-    if (error is ApiException && (error as ApiException).statusCode == 0) return true;
+    if (error is ApiException && (error as ApiException).statusCode == 0)
+      return true;
     final lower = error.toString().toLowerCase();
     return lower.contains('cannot reach server') ||
         lower.contains('waking up') ||
@@ -295,21 +327,30 @@ class _ErrorSection extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+            style: const TextStyle(
+              color: SpotifyColors.textSecondary,
+              fontSize: 14,
+            ),
           ),
           if (error != null && _isNetworkError) ...[
             const SizedBox(height: 8),
             const Text(
               'Please check your connection and try again. The server may be waking up — wait a moment and retry.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+              style: TextStyle(
+                color: SpotifyColors.textSecondary,
+                fontSize: 12,
+              ),
             ),
           ] else if (error != null && error.toString().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               error.toString(),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+              style: const TextStyle(
+                color: SpotifyColors.textSecondary,
+                fontSize: 12,
+              ),
             ),
           ],
           const SizedBox(height: 12),

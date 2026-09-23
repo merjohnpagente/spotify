@@ -25,13 +25,14 @@ class _QueueScreenState extends ConsumerState<QueueScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: SpotifyColors.textPrimary, size: 24),
+          tooltip: 'Close queue',
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Queue',
           style: TextStyle(
             color: SpotifyColors.textPrimary,
-            fontSize: 20,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),

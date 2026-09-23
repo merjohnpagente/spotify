@@ -92,23 +92,28 @@ class SearchResultCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Material(
-              color: Colors.transparent,
-              shape: const CircleBorder(),
-              child: InkWell(
-                onTap: onPlay,
-                customBorder: const CircleBorder(),
-                child: Ink(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: SpotifyColors.primaryAccent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow,
-                    color: SpotifyColors.textPrimary,
-                    size: 20,
+            Semantics(
+              button: true,
+              label: 'Play $title by $artist',
+              child: Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  onTap: onPlay,
+                  customBorder: const CircleBorder(),
+                  child: Ink(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: SpotifyColors.primaryAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      color: SpotifyColors.textPrimary,
+                      size: 20,
+                      semanticLabel: 'Play',
+                    ),
                   ),
                 ),
               ),
