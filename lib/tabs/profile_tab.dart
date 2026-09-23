@@ -6,6 +6,7 @@ import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/utils/route_transitions.dart';
 import 'package:spotify_fy/utils/scroll_registry.dart';
+import 'package:spotify_fy/utils/preference_labels.dart';
 import 'package:spotify_fy/views/history_screen.dart';
 import 'package:spotify_fy/views/settings_screen.dart';
 import 'package:spotify_fy/views/stats_screen.dart';
@@ -19,23 +20,6 @@ class ProfileTab extends ConsumerStatefulWidget {
 
 class _ProfileTabState extends ConsumerState<ProfileTab> {
   final ScrollController _scrollController = ScrollController();
-
-  static const Map<String, String> _qualityLabels = {
-    'low': 'Low',
-    'medium': 'Medium',
-    'high': 'High',
-  };
-
-  static const Map<String, String> _languageLabels = {
-    'en': 'English',
-    'hi': 'Hindi',
-    'es': 'Spanish',
-    'fr': 'French',
-    'de': 'German',
-    'pt': 'Portuguese',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-  };
 
   @override
   void initState() {
@@ -206,7 +190,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _qualityLabels[audioQuality] ?? audioQuality,
+                  qualityLabels[audioQuality] ?? audioQuality,
                   style: const TextStyle(
                     color: SpotifyColors.textSecondary,
                     fontSize: 14,
@@ -224,7 +208,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _languageLabels[language] ?? language,
+                  languageLabels[language] ?? language,
                   style: const TextStyle(
                     color: SpotifyColors.textSecondary,
                     fontSize: 14,
@@ -351,7 +335,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                 ),
               ),
             ),
-            for (final entry in _qualityLabels.entries)
+            for (final entry in qualityLabels.entries)
               ListTile(
                 title: Text(
                   entry.value,
@@ -389,7 +373,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                 ),
               ),
             ),
-            for (final entry in _languageLabels.entries)
+            for (final entry in languageLabels.entries)
               ListTile(
                 title: Text(
                   entry.value,
@@ -421,9 +405,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               ? 'Language'
               : key;
       final displayValue = key == 'audioQuality'
-          ? (_qualityLabels[value] ?? value)
+          ? (qualityLabels[value] ?? value)
           : key == 'language'
-              ? (_languageLabels[value] ?? value)
+              ? (languageLabels[value] ?? value)
               : value;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$label set to $displayValue')),

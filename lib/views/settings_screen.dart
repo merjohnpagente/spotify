@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/route_transitions.dart';
+import 'package:spotify_fy/utils/preference_labels.dart';
 import 'package:spotify_fy/version.dart';
 import 'package:spotify_fy/views/stats_screen.dart';
 
@@ -15,23 +16,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  static const Map<String, String> _qualityLabels = {
-    'low': 'Low',
-    'medium': 'Medium',
-    'high': 'High',
-  };
-
-  static const Map<String, String> _languageLabels = {
-    'en': 'English',
-    'hi': 'Hindi',
-    'es': 'Spanish',
-    'fr': 'French',
-    'de': 'German',
-    'pt': 'Portuguese',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-  };
-
   bool _notifications = true;
 
   @override
@@ -96,11 +80,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SettingTile(
             icon: Icons.audiotrack,
             title: 'Audio Quality',
-            subtitle: _qualityLabels[audioQuality] ?? audioQuality,
+            subtitle: qualityLabels[audioQuality] ?? audioQuality,
             onTap: () => _pickOption(
               context,
               title: 'Audio Quality',
-              options: _qualityLabels,
+              options: qualityLabels,
               current: audioQuality,
               onSelected: (value) => _savePreference('audioQuality', value),
             ),
@@ -108,11 +92,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SettingTile(
             icon: Icons.language,
             title: 'Language',
-            subtitle: _languageLabels[language] ?? language,
+            subtitle: languageLabels[language] ?? language,
             onTap: () => _pickOption(
               context,
               title: 'Language',
-              options: _languageLabels,
+              options: languageLabels,
               current: language,
               onSelected: (value) => _savePreference('language', value),
             ),
@@ -306,9 +290,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ? 'Language'
               : key;
       final displayValue = key == 'audioQuality'
-          ? (_qualityLabels[value] ?? value)
+          ? (qualityLabels[value] ?? value)
           : key == 'language'
-              ? (_languageLabels[value] ?? value)
+              ? (languageLabels[value] ?? value)
               : value;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$label set to $displayValue')),

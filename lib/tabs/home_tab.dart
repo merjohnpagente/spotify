@@ -17,13 +17,11 @@ class HomeTab extends ConsumerStatefulWidget {
 }
 
 class _HomeTabState extends ConsumerState<HomeTab> {
-  String _greeting = 'Good Evening';
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _updateGreeting();
     ScrollRegistry.register(0, _scrollController);
   }
 
@@ -34,15 +32,16 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     super.dispose();
   }
 
-  void _updateGreeting() {
+  /// Computed in [build] so it stays correct across midnight while the app
+  /// stays open (was cached once in initState).
+  String get _greeting {
     final hour = DateTime.now().hour;
     if (hour < 12) {
-      _greeting = 'Good Morning';
+      return 'Good Morning';
     } else if (hour < 17) {
-      _greeting = 'Good Afternoon';
-    } else {
-      _greeting = 'Good Evening';
+      return 'Good Afternoon';
     }
+    return 'Good Evening';
   }
 
   void _showComingSoon(String feature) {
@@ -308,8 +307,9 @@ class _ErrorSection extends StatelessWidget {
 
   bool get _isNetworkError {
     if (error == null) return false;
-    if (error is ApiException && (error as ApiException).statusCode == 0)
+    if (error is ApiException && (error as ApiException).statusCode == 0) {
       return true;
+    }
     final lower = error.toString().toLowerCase();
     return lower.contains('cannot reach server') ||
         lower.contains('waking up') ||

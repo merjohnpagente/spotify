@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/utils/validators.dart';
+import 'package:spotify_fy/widgets/app_input_field.dart';
 import 'package:spotify_fy/widgets/sign_in_button.dart';
 import 'package:spotify_fy/providers/providers.dart';
 
@@ -25,6 +27,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -76,7 +80,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildInputField(
+                      child: AppInputField(
                         controller: _firstNameController,
                         label: 'First Name',
                         hint: 'John',
@@ -91,7 +95,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildInputField(
+                      child: AppInputField(
                         controller: _lastNameController,
                         label: 'Last Name',
                         hint: 'Doe',
@@ -107,24 +111,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _buildInputField(
+                AppInputField(
                   controller: _emailController,
                   label: 'Email',
                   hint: 'Enter your email',
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
+                  validator: validateEmail,
                 ),
                 const SizedBox(height: 16),
-                _buildInputField(
+                AppInputField(
                   controller: _usernameController,
                   label: 'Username',
                   hint: 'Choose a username',
@@ -140,7 +136,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildInputField(
+                AppInputField(
                   controller: _passwordController,
                   label: 'Password',
                   hint: 'Create a password',
@@ -164,7 +160,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildInputField(
+                AppInputField(
                   controller: _confirmPasswordController,
                   label: 'Confirm Password',
                   hint: 'Confirm your password',
@@ -226,64 +222,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildInputField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType? keyboardType,
-    bool obscureText = false,
-    Widget? suffixIcon,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: SpotifyColors.textPrimary,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          obscureText: obscureText,
-          style: const TextStyle(color: SpotifyColors.textPrimary, fontSize: 16),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 16),
-            prefixIcon: Icon(icon, color: SpotifyColors.textSecondary, size: 24),
-            suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: SpotifyColors.secondaryBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(24),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(24),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(24),
-              borderSide: const BorderSide(color: SpotifyColors.primaryAccent, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(24),
-              borderSide: const BorderSide(color: Colors.red, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-          ),
-          validator: validator,
-        ),
-      ],
     );
   }
 
