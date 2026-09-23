@@ -246,6 +246,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'bio': bioCtrl.text.trim(),
     });
     if (mounted) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated')),
       );
@@ -301,8 +302,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final updated = Map<String, dynamic>.from(current)..[key] = value;
     await ref.read(authProvider.notifier).updateProfile({'preferences': updated});
     if (mounted) {
+      final label = key == 'audioQuality'
+          ? 'Audio quality'
+          : key == 'language'
+              ? 'Language'
+              : key;
+      final displayValue = key == 'audioQuality'
+          ? (_qualityLabels[value] ?? value)
+          : key == 'language'
+              ? (_languageLabels[value] ?? value)
+              : value;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$key saved')),
+        SnackBar(content: Text('$label set to $displayValue')),
       );
     }
   }

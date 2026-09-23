@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -133,29 +134,31 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
     final player = ref.watch(playerProvider);
     final showMiniPlayer = player.currentSong != null;
 
-    if (showMiniPlayer && !_miniPlayerController.isAnimating) {
-      _miniPlayerController.forward();
+    ref.listen(playerProvider.select((p) => p.currentSong != null), (prev, next) {
+      if (next && !_miniPlayerController.isCompleted) {
+        _miniPlayerController.forward();
+      } else if (!next && _miniPlayerController.isCompleted) {
+        _miniPlayerController.reverse();
+      }
+    });
+    // Ensure animation starts correctly on first frame if song already present
+    if (showMiniPlayer && _miniPlayerController.status == AnimationStatus.dismissed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _miniPlayerController.forward();
+      });
     }
 
     return Scaffold(
       backgroundColor: SpotifyColors.primaryBackground,
-      body: Stack(
+      body: Column(
         children: [
-          _tabs[_currentIndex],
+          Expanded(child: _tabs[_currentIndex]),
           if (showMiniPlayer)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: SafeArea(
-                bottom: true,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 56),
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: _buildMiniPlayer(player),
-                  ),
-                ),
+            SafeArea(
+              top: false,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: _buildMiniPlayer(player),
               ),
             ),
         ],
@@ -216,12 +219,18 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: Image.network(
-                song.thumbnailUrl,
+              child: CachedNetworkImage(
+                imageUrl: song.thumbnailUrl,
                 width: 48,
                 height: 48,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
+                placeholder: (context, url) => Container(
+                  width: 48,
+                  height: 48,
+                  color: SpotifyColors.cardBackground,
+                  child: const Icon(Icons.music_note, color: SpotifyColors.textSecondary, size: 24),
+                ),
+                errorWidget: (context, url, error) => Container(
                   width: 48,
                   height: 48,
                   color: SpotifyColors.cardBackground,
@@ -266,28 +275,33 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
                   constraints: const BoxConstraints(),
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: controller.togglePlayPause,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: SpotifyColors.primaryAccent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: player.loading
-                        ? const Padding(
-                            padding: EdgeInsets.all(8),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
+                Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: controller.togglePlayPause,
+                    customBorder: const CircleBorder(),
+                    child: Ink(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: SpotifyColors.primaryAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: player.loading
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: SpotifyColors.textPrimary,
+                              ),
+                            )
+                          : Icon(
+                              player.isPlaying ? Icons.pause : Icons.play_arrow,
                               color: SpotifyColors.textPrimary,
+                              size: 24,
                             ),
-                          )
-                        : Icon(
-                            player.isPlaying ? Icons.pause : Icons.play_arrow,
-                            color: SpotifyColors.textPrimary,
-                            size: 18,
-                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),

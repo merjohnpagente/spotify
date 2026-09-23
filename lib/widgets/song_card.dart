@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:spotify_fy/theme.dart';
 
@@ -24,7 +25,6 @@ class SongCard extends StatefulWidget {
 }
 
 class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin {
-  bool _isHovered = false;
   late AnimationController _scaleController;
   late Animation<double> _scaleAnimation;
 
@@ -46,18 +46,26 @@ class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
+  void _handleHover(bool hovering) {
+    if (hovering) {
+      _scaleController.forward();
+    } else {
+      _scaleController.reverse();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => _handleHover(true),
+      onExit: (_) => _handleHover(false),
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedBuilder(
           animation: _scaleAnimation,
           builder: (context, child) {
             return Transform.scale(
-              scale: _isHovered ? _scaleAnimation.value : 1.0,
+              scale: _scaleAnimation.value,
               child: child,
             );
           },
@@ -68,12 +76,18 @@ class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      widget.imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: widget.imageUrl,
                       width: 160,
                       height: 160,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
+                      placeholder: (context, url) => Container(
+                        width: 160,
+                        height: 160,
+                        color: SpotifyColors.cardBackground,
+                        child: const Icon(Icons.music_note, color: SpotifyColors.textSecondary, size: 48),
+                      ),
+                      errorWidget: (context, url, error) => Container(
                         width: 160,
                         height: 160,
                         color: SpotifyColors.cardBackground,
@@ -81,14 +95,18 @@ class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin
                       ),
                     ),
                   ),
-                  if (_isHovered)
-                    Positioned(
-                      bottom: 12,
-                      right: 12,
-                      child: GestureDetector(
+                  // Play button: always visible on mobile, hover-revealed on desktop with scale
+                  Positioned(
+                    bottom: 12,
+                    right: 12,
+                    child: Material(
+                      color: Colors.transparent,
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      child: InkWell(
                         onTap: widget.onPlay,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                        customBorder: const CircleBorder(),
+                        child: Ink(
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
@@ -110,6 +128,25 @@ class _SongCardState extends State<SongCard> with SingleTickerProviderStateMixin
                         ),
                       ),
                     ),
+                  ),
+                  // Subtle gradient overlay for better play button contrast
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.15),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),

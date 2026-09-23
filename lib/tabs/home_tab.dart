@@ -26,15 +26,19 @@ class _HomeTabState extends ConsumerState<HomeTab> {
 
   void _updateGreeting() {
     final hour = DateTime.now().hour;
-    setState(() {
-      if (hour < 12) {
-        _greeting = 'Good Morning';
-      } else if (hour < 17) {
-        _greeting = 'Good Afternoon';
-      } else {
-        _greeting = 'Good Evening';
-      }
-    });
+    if (hour < 12) {
+      _greeting = 'Good Morning';
+    } else if (hour < 17) {
+      _greeting = 'Good Afternoon';
+    } else {
+      _greeting = 'Good Evening';
+    }
+  }
+
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature — coming soon')),
+    );
   }
 
   void _playSong(BuildContext context, List<Song> queue, int index) {
@@ -59,11 +63,11 @@ class _HomeTabState extends ConsumerState<HomeTab> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none, color: SpotifyColors.textPrimary, size: 28),
-            onPressed: () {},
+            onPressed: () => _showComingSoon('Notifications'),
           ),
           IconButton(
             icon: const Icon(Icons.settings, color: SpotifyColors.textPrimary, size: 28),
-            onPressed: () {},
+            onPressed: () => _showComingSoon('Settings — see Profile tab'),
           ),
         ],
       ),
@@ -295,20 +299,8 @@ class _ErrorSection extends StatelessWidget {
           ),
           if (error != null && _isNetworkError) ...[
             const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Base URL: ${ApiClient.defaultBaseUrl}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
-            ),
-            const SizedBox(height: 4),
             const Text(
-              'If on physical device, run: flutter run --dart-define=API_BASE_URL=http://<YOUR_PC_IP>:3000',
+              'Please check your connection and try again. The server may be waking up — wait a moment and retry.',
               textAlign: TextAlign.center,
               style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
             ),

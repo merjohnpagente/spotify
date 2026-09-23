@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:spotify_fy/theme.dart';
 
@@ -74,15 +75,15 @@ class _GenreCardState extends State<GenreCard> with SingleTickerProviderStateMix
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: widget.imageUrl != null
-                      ? Image.network(
-                          widget.imageUrl!,
+                      ? CachedNetworkImage(
+                          imageUrl: widget.imageUrl!,
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,
                           color: Colors.black.withValues(alpha: 0.3),
                           colorBlendMode: BlendMode.darken,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _buildFallback(),
+                          placeholder: (context, url) => _buildFallback(),
+                          errorWidget: (context, url, error) => _buildFallback(),
                         )
                       : _buildFallback(),
                 ),

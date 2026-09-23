@@ -28,6 +28,7 @@ class PlayerState {
   final bool isLiked;
   final bool likedLoaded;
   final String? error;
+  final String? loadingMessage;
 
   const PlayerState({
     this.queue = const [],
@@ -42,6 +43,7 @@ class PlayerState {
     this.isLiked = false,
     this.likedLoaded = false,
     this.error,
+    this.loadingMessage,
   });
 
   Song? get currentSong =>
@@ -60,6 +62,7 @@ class PlayerState {
     bool? isLiked,
     bool? likedLoaded,
     String? error,
+    String? loadingMessage,
     bool clearError = false,
   }) {
     return PlayerState(
@@ -75,6 +78,7 @@ class PlayerState {
       isLiked: isLiked ?? this.isLiked,
       likedLoaded: likedLoaded ?? this.likedLoaded,
       error: clearError ? null : (error ?? this.error),
+      loadingMessage: loadingMessage ?? (loading == true ? this.loadingMessage : null),
     );
   }
 }
@@ -177,6 +181,8 @@ class PlayerController extends StateNotifier<PlayerState> {
     await playQueue(list, index: safeIndex);
   }
 
+  Timer? _loadingTimer;
+
   Future<void> _loadAndPlay() async {
     final song = state.currentSong;
     if (song == null) return;
@@ -187,6 +193,20 @@ class PlayerController extends StateNotifier<PlayerState> {
       state = state.copyWith(duration: Duration(seconds: song.duration));
     }
     state = state.copyWith(loading: true, isPlaying: true, clearError: true);
+
+    // After 5s of loading, show helpful message (Render cold start / slow network)
+    _loadingTimer?.cancel();
+    _loadingTimer = Timer(const Duration(seconds: 5), () {
+      if (state.loading) {
+        state = state.copyWith(loadingMessage: 'Server warming up, please wait...');
+      }
+    });
+    // After 15s, update to longer message
+    _loadingTimer = Timer(const Duration(seconds: 15), () {
+      if (state.loading) {
+        state = state.copyWith(loadingMessage: 'Still loading — Render free tier needs wake-up time. Tap play again to retry.');
+      }
+    });
 
     try {
       final quality = _ref

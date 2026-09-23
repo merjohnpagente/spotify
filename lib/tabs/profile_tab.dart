@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotify_fy/theme.dart';
@@ -85,12 +86,17 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                   ),
                   child: user?.avatarUrl != null && (user!.avatarUrl!.isNotEmpty)
                       ? ClipOval(
-                          child: Image.network(
-                            user.avatarUrl!,
+                          child: CachedNetworkImage(
+                            imageUrl: user.avatarUrl!,
                             width: 100,
                             height: 100,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => const Icon(
+                            placeholder: (context, url) => const Icon(
+                              Icons.person,
+                              color: SpotifyColors.textPrimary,
+                              size: 50,
+                            ),
+                            errorWidget: (context, url, error) => const Icon(
                               Icons.person,
                               color: SpotifyColors.textPrimary,
                               size: 50,
@@ -161,13 +167,18 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           const SizedBox(height: 16),
           _buildSettingTile(
             icon: Icons.dark_mode,
-            title: 'Dark Mode',
-            trailing: Switch(
-              value: true,
-              onChanged: (_) {},
-              activeThumbColor: SpotifyColors.primaryAccent,
-              inactiveThumbColor: SpotifyColors.textSecondary,
-              inactiveTrackColor: SpotifyColors.cardBackground,
+            title: 'Dark Theme',
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: SpotifyColors.primaryAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: SpotifyColors.primaryAccent.withValues(alpha: 0.3)),
+              ),
+              child: const Text(
+                'Always on',
+                style: TextStyle(color: SpotifyColors.primaryAccent, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
           _buildSettingTile(
@@ -274,13 +285,21 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy Policy',
             trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
-            onTap: () {},
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Privacy Policy — coming soon')),
+              );
+            },
           ),
           _buildSettingTile(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
             trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
-            onTap: () {},
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Terms of Service — coming soon')),
+              );
+            },
           ),
           const SizedBox(height: 48),
           SizedBox(
@@ -393,8 +412,18 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
       'preferences': updated,
     });
     if (mounted) {
+      final label = key == 'audioQuality'
+          ? 'Audio quality'
+          : key == 'language'
+              ? 'Language'
+              : key;
+      final displayValue = key == 'audioQuality'
+          ? (_qualityLabels[value] ?? value)
+          : key == 'language'
+              ? (_languageLabels[value] ?? value)
+              : value;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$key saved as $value')),
+        SnackBar(content: Text('$label set to $displayValue')),
       );
     }
   }

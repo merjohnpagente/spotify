@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -59,6 +60,7 @@ class _QueueScreenState extends ConsumerState<QueueScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: player.queue.length,
               buildDefaultDragHandles: false,
+              // ignore: deprecated_member_use
               onReorder: (from, to) {
                 final target = to > from ? to - 1 : to;
                 controller.moveQueueItem(from, target);
@@ -128,12 +130,18 @@ class _QueueTile extends StatelessWidget {
           ),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: Image.network(
-              imageUrl,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
               width: 48,
               height: 48,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
+              placeholder: (context, url) => Container(
+                width: 48,
+                height: 48,
+                color: SpotifyColors.cardBackground,
+                child: const Icon(Icons.music_note, color: SpotifyColors.textSecondary, size: 22),
+              ),
+              errorWidget: (context, url, error) => Container(
                 width: 48,
                 height: 48,
                 color: SpotifyColors.cardBackground,

@@ -75,7 +75,11 @@ class LibraryTab extends ConsumerWidget {
               title: 'Downloaded',
               subtitle: 'Offline playback',
               iconColor: SpotifyColors.primaryAccent,
-              onTap: () {},
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Offline downloads — coming soon')),
+                );
+              },
             ),
             const SizedBox(height: 24),
             const Text(

@@ -109,7 +109,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Password reset — coming soon')),
+                          );
+                        },
                         child: const Text(
                           'Forgot Password?',
                           style: TextStyle(
@@ -150,12 +154,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       loading: _isGoogleLoading,
                     ),
                     const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           'Don\'t have an account? ',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: SpotifyColors.textSecondary,
                             fontSize: 14,
                           ),
@@ -167,6 +172,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               MaterialPageRoute(builder: (context) => const RegisterScreen()),
                             );
                           },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 36),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                           child: const Text(
                             'Sign Up',
                             style: TextStyle(

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,6 +50,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     return '$minutes:$secs';
   }
 
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature — coming soon')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final player = ref.watch(playerProvider);
@@ -76,7 +83,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.more_vert, color: SpotifyColors.textPrimary, size: 28),
-                    onPressed: () {},
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('More options — coming soon')),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -117,13 +128,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             child: Container(
                               color: SpotifyColors.cardBackground,
                               child: song != null
-                                  ? Image.network(
-                                      song.thumbnailUrl,
+                                  ? CachedNetworkImage(
+                                      imageUrl: song.thumbnailUrl,
                                       fit: BoxFit.contain,
                                       width: 280,
                                       height: 280,
-                                      errorBuilder: (context, error, stackTrace) =>
-                                          _buildArtworkFallback(),
+                                      placeholder: (context, url) => _buildArtworkFallback(),
+                                      errorWidget: (context, url, error) => _buildArtworkFallback(),
                                     )
                                   : _buildArtworkFallback(),
                             ),
@@ -261,6 +272,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             textAlign: TextAlign.center,
                           ),
                         ),
+                      if (player.loading && player.loadingMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            player.loadingMessage!,
+                            style: const TextStyle(color: Colors.orangeAccent, fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       const SizedBox(height: 32),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -326,9 +346,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildBottomActionButton(Icons.devices, 'Devices'),
-                          _buildBottomActionButton(Icons.share, 'Share'),
-                          _buildBottomActionButton(Icons.lyrics, 'Lyrics'),
+                          _buildBottomActionButton(
+                            Icons.devices,
+                            'Devices',
+                            onTap: () => _showComingSoon('Devices'),
+                          ),
+                          _buildBottomActionButton(
+                            Icons.share,
+                            'Share',
+                            onTap: () => _showComingSoon('Share'),
+                          ),
+                          _buildBottomActionButton(
+                            Icons.lyrics,
+                            'Lyrics',
+                            onTap: () => _showComingSoon('Lyrics'),
+                          ),
                           _buildBottomActionButton(
                             Icons.queue_music,
                             'Queue',
@@ -371,84 +403,123 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     required double size,
     bool background = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: background ? 56 : 48,
-        height: background ? 56 : 48,
-        decoration: background
-            ? BoxDecoration(
-                color: SpotifyColors.cardBackground,
-                shape: BoxShape.circle,
-              )
-            : null,
-        child: Icon(
-          icon,
-          color: isActive ? SpotifyColors.primaryAccent : SpotifyColors.textPrimary,
-          size: size,
+    final dim = background ? 56.0 : 48.0;
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Ink(
+          width: dim,
+          height: dim,
+          decoration: background
+              ? const BoxDecoration(
+                  color: SpotifyColors.cardBackground,
+                  shape: BoxShape.circle,
+                )
+              : null,
+          child: Center(
+            child: Icon(
+              icon,
+              color: onTap == null
+                  ? SpotifyColors.textSecondary.withValues(alpha: 0.4)
+                  : isActive
+                      ? SpotifyColors.primaryAccent
+                      : SpotifyColors.textPrimary,
+              size: size,
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildPlayPauseButton(PlayerState player, PlayerController controller) {
-    return GestureDetector(
-      onTap: player.loading || player.currentSong == null ? null : controller.togglePlayPause,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          color: SpotifyColors.primaryAccent,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: player.loading
-            ? const Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: SpotifyColors.textPrimary,
-                ),
-              )
-            : Icon(
-                player.isPlaying ? Icons.pause : Icons.play_arrow,
-                color: SpotifyColors.textPrimary,
-                size: 28,
+    final disabled = player.loading || player.currentSong == null;
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: disabled ? null : controller.togglePlayPause,
+        customBorder: const CircleBorder(),
+        child: Ink(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: disabled
+                ? SpotifyColors.primaryAccent.withValues(alpha: 0.5)
+                : SpotifyColors.primaryAccent,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: SpotifyColors.primaryAccent.withValues(alpha: 0.4),
+                blurRadius: 20,
+                spreadRadius: 5,
               ),
+            ],
+          ),
+          child: player.loading
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: SpotifyColors.textPrimary,
+                  ),
+                )
+              : Icon(
+                  player.isPlaying ? Icons.pause : Icons.play_arrow,
+                  color: SpotifyColors.textPrimary,
+                  size: 28,
+                ),
+        ),
       ),
     );
   }
 
   Widget _buildBottomActionButton(IconData icon, String label, {VoidCallback? onTap}) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          children: [
+            Material(
               color: SpotifyColors.cardBackground,
-              shape: BoxShape.circle,
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: onTap,
+                customBorder: const CircleBorder(),
+                child: Ink(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: SpotifyColors.cardBackground,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: onTap == null
+                        ? SpotifyColors.textSecondary.withValues(alpha: 0.5)
+                        : SpotifyColors.textPrimary,
+                    size: 24,
+                  ),
+                ),
+              ),
             ),
-            child: Icon(icon, color: SpotifyColors.textPrimary, size: 24),
-          ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: SpotifyColors.textSecondary,
-            fontSize: 10,
-          ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: onTap == null
+                    ? SpotifyColors.textSecondary.withValues(alpha: 0.5)
+                    : SpotifyColors.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
         ),
-      ],
       ),
     );
   }

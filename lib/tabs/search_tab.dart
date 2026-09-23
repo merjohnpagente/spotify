@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -256,23 +257,24 @@ class _SearchTabState extends ConsumerState<SearchTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  e.toString(),
+                const Text(
+                  'Could not reach the music server',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
+                  style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 14),
                 ),
                 if (isNetworkError) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Base URL: ${ApiClient.defaultBaseUrl}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
-                  ),
                   const SizedBox(height: 8),
                   const Text(
-                    'If on physical device, run: flutter run --dart-define=API_BASE_URL=http://<YOUR_PC_IP>:3000',
+                    'Please check your connection and try again. The server may be waking up — wait a moment and retry.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    e.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 12),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -420,12 +422,18 @@ class _ArtistListTile extends StatelessWidget {
         child: Row(
           children: [
             ClipOval(
-              child: Image.network(
-                imageUrl,
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
                 width: 56,
                 height: 56,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
+                placeholder: (context, url) => Container(
+                  width: 56,
+                  height: 56,
+                  color: SpotifyColors.cardBackground,
+                  child: const Icon(Icons.person, color: SpotifyColors.textSecondary, size: 28),
+                ),
+                errorWidget: (context, url, error) => Container(
                   width: 56,
                   height: 56,
                   color: SpotifyColors.cardBackground,

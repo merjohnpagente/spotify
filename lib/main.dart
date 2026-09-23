@@ -1,14 +1,33 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:spotify_fy/auth/login_screen.dart';
 import 'package:spotify_fy/auth/register_screen.dart';
 import 'package:spotify_fy/main_screen.dart';
 import 'package:spotify_fy/providers/providers.dart';
+import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/services/token_store.dart';
 import 'package:spotify_fy/theme.dart';
+
+/// Periodically pings the backend /health endpoint to prevent Render free tier
+/// from sleeping (idle >15min = cold start = 30-60s loading on next play).
+void _startKeepAlive() {
+  final baseUrl = ApiClient.defaultBaseUrl;
+  if (baseUrl.isEmpty) return;
+  final uri = Uri.parse('$baseUrl/health');
+  Timer.periodic(const Duration(minutes: 8), (_) async {
+    try {
+      await http.get(uri).timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Best-effort — ignore failures
+    }
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +39,8 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase init skipped: $e');
   }
+  // Keep Render server alive — ping every 8 min so it never sleeps
+  _startKeepAlive();
   runApp(
     ProviderScope(
       overrides: [

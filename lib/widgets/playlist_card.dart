@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:spotify_fy/theme.dart';
 
@@ -71,12 +72,18 @@ class _PlaylistCardState extends State<PlaylistCard> with SingleTickerProviderSt
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        widget.imageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: widget.imageUrl,
                         width: 160,
                         height: 160,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
+                        placeholder: (context, url) => Container(
+                          width: 160,
+                          height: 160,
+                          color: SpotifyColors.cardBackground,
+                          child: const Icon(Icons.music_note, color: SpotifyColors.textSecondary, size: 48),
+                        ),
+                        errorWidget: (context, url, error) => Container(
                           width: 160,
                           height: 160,
                           color: SpotifyColors.cardBackground,
