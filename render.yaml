@@ -35,8 +35,15 @@ services:
       - key: REQUEST_TIMEOUT
         value: 90000
       # Firebase ID-token verification for Google sign-in (public certs, no keys needed).
+      # For Firestore user mirroring, also set FIREBASE_CLIENT_EMAIL + PRIVATE_KEY
+      # (Firebase console > Project settings > Service accounts > Generate new private key).
+      # Without them, users still work in MongoDB but won't appear in Firestore console.
       - key: FIREBASE_PROJECT_ID
         value: spotify-ee119
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
       # YouTube bot-checks Render's datacenter IP on watch-page extraction
       # ("Sign in to confirm you're not a bot"). Paste a Netscape cookies.txt
       # exported from a logged-in browser to lift it — see backend/.env.example.

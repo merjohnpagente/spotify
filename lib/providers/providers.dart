@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotify_fy/models/user_profile.dart';
 import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/services/auth_service.dart';
+import 'package:spotify_fy/services/firestore_user_service.dart';
 import 'package:spotify_fy/services/google_auth_service.dart';
 import 'package:spotify_fy/services/music_service.dart';
 import 'package:spotify_fy/services/playlist_service.dart';
@@ -49,6 +50,10 @@ final userServiceProvider = Provider<UserService>((ref) {
   return UserService(ref.watch(apiClientProvider));
 });
 
+final firestoreUserServiceProvider = Provider<FirestoreUserService>((ref) {
+  return FirestoreUserService();
+});
+
 class AuthState {
   final bool initialized;
   final bool loading;
@@ -82,8 +87,9 @@ class AuthProvider extends StateNotifier<AuthState> {
   final AuthService _authService;
   final GoogleAuthService _googleAuth;
   final TokenStore _tokenStore;
+  final FirestoreUserService _firestore;
 
-  AuthProvider(this._authService, this._googleAuth, this._tokenStore)
+  AuthProvider(this._authService, this._googleAuth, this._tokenStore, this._firestore)
       : super(const AuthState());
 
   Future<void> init() async {
@@ -108,6 +114,8 @@ class AuthProvider extends StateNotifier<AuthState> {
           'stats': fresh.stats,
           'createdAt': fresh.createdAt?.toIso8601String(),
         });
+        // Client mirror to Firestore (best-effort) — backend admin sync is primary.
+        unawaited(_firestore.syncUser(fresh));
       } catch (_) {
         // Token invalid/expired without successful refresh; stay signed out
         await _tokenStore.clear();
@@ -124,6 +132,7 @@ class AuthProvider extends StateNotifier<AuthState> {
       final session = await _authService.login(email: email, password: password);
       await _saveSession(session);
       state = state.copyWith(loading: false, initialized: true, user: session.user);
+      unawaited(_firestore.syncUser(session.user));
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
@@ -148,6 +157,7 @@ class AuthProvider extends StateNotifier<AuthState> {
       final session = await _authService.googleLogin(idToken);
       await _saveSession(session);
       state = state.copyWith(loading: false, initialized: true, user: session.user);
+      unawaited(_firestore.syncUser(session.user));
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
@@ -229,6 +239,7 @@ class AuthProvider extends StateNotifier<AuthState> {
       );
       await _saveSession(session);
       state = state.copyWith(loading: false, initialized: true, user: session.user);
+      unawaited(_firestore.syncUser(session.user));
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
@@ -268,6 +279,7 @@ class AuthProvider extends StateNotifier<AuthState> {
         'createdAt': updated.createdAt?.toIso8601String(),
       });
       state = state.copyWith(loading: false, user: updated);
+      unawaited(_firestore.syncUser(updated));
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
@@ -303,5 +315,6 @@ final authProvider = StateNotifierProvider<AuthProvider, AuthState>((ref) {
   final authService = ref.watch(authServiceProvider);
   final googleAuth = ref.watch(googleAuthServiceProvider);
   final tokenStore = ref.watch(tokenStoreProvider);
-  return AuthProvider(authService, googleAuth, tokenStore);
+  final firestore = ref.watch(firestoreUserServiceProvider);
+  return AuthProvider(authService, googleAuth, tokenStore, firestore);
 });

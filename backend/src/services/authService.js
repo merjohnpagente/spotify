@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { User, Session } = require('../models');
-const { verifyIdToken } = require('../config/firebase');
+const { verifyIdToken, syncUserToFirestore } = require('../config/firebase');
 const { cacheSet, cacheGet, cacheDelete } = require('../config/redis');
 
 const generateTokens = (user) => {
@@ -61,6 +61,9 @@ const registerWithEmail = async (email, password, username, firstName, lastName)
     lastName,
   });
 
+  // Firestore mirror — best-effort, never fails registration.
+  await syncUserToFirestore(user, { provider: 'email', firebaseUid: null });
+
   const tokens = generateTokens(user);
   await storeRefreshToken(user._id, tokens.refreshToken);
 
@@ -76,6 +79,7 @@ const loginWithEmail = async (email, password) => {
 
   user.lastLoginAt = new Date();
   await user.save();
+  await syncUserToFirestore(user, { provider: 'email' });
 
   const tokens = generateTokens(user);
   await storeRefreshToken(user._id, tokens.refreshToken);
@@ -112,6 +116,7 @@ const loginWithGoogle = async (idToken) => {
   user.lastLoginAt = new Date();
   if (picture && !user.avatarUrl) user.avatarUrl = picture;
   await user.save();
+  await syncUserToFirestore(user, { provider: 'google', firebaseUid: uid });
 
   const tokens = generateTokens(user);
   await storeRefreshToken(user._id, tokens.refreshToken);
@@ -174,6 +179,8 @@ const updateUserProfile = async (userId, updates) => {
 
   const user = await User.findByIdAndUpdate(userId, updateData, { new: true, runValidators: true });
   await cacheDelete(`user:${userId}`);
+  // Keep Firestore in sync — no provider override so existing value is kept.
+  await syncUserToFirestore(user);
   return user.toPublicJSON();
 };
 

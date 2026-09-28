@@ -115,9 +115,72 @@ const createUser = async (userData) => {
   return await auth.createUser(userData);
 };
 
+const getFirestore = () => {
+  // Lazily init — returns null (and warns) when service-account
+  // env is missing so the API still boots without Firestore.
+  const app = firebaseApp || initializeFirebase();
+  if (!app) return null;
+  try {
+    return admin.firestore();
+  } catch (error) {
+    console.warn('Firestore unavailable:', error.message);
+    return null;
+  }
+};
+
+// Mirror the app's User (Mongo) to Firestore `users/{mongoId}`.
+// Uses admin SDK so Firestore rules are bypassed. Best-effort: never
+// throws — caller logs a warn and keeps serving the API request.
+const syncUserToFirestore = async (user, meta = {}) => {
+  const db = getFirestore();
+  if (!db || !user) return;
+  const rawId = user._id ?? user.id;
+  if (!rawId) return;
+  const docId = String(rawId);
+  try {
+    const tsNow = admin.firestore.FieldValue.serverTimestamp();
+    const toTs = (v) => {
+      if (!v) return null;
+      try {
+        return admin.firestore.Timestamp.fromDate(new Date(v));
+      } catch (_) {
+        return null;
+      }
+    };
+    const data = {
+      id: docId,
+      email: user.email ?? null,
+      username: user.username ?? null,
+      firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
+      avatarUrl: user.avatarUrl ?? null,
+      bio: user.bio ?? '',
+      preferences: user.preferences ?? { theme: 'dark', audioQuality: 'medium', language: 'en', notifications: true },
+      stats: user.stats ?? { totalListeningTime: 0, totalSongsPlayed: 0, likedSongsCount: 0 },
+      accountStatus: user.accountStatus ?? 'active',
+      createdAt: toTs(user.createdAt) ?? tsNow,
+      updatedAt: tsNow,
+      lastLoginAt: toTs(user.lastLoginAt),
+    };
+    // Only set provider/firebaseUid when explicitly provided — so
+    // profile updates (which don't know the original provider) keep
+    // whatever was stored before.
+    if (meta.provider) data.provider = meta.provider;
+    if ('firebaseUid' in meta) data.firebaseUid = meta.firebaseUid ?? null;
+    else if (user.firebaseUid) data.firebaseUid = user.firebaseUid;
+    await db.collection('users').doc(docId).set(data, { merge: true });
+    const prov = data.provider ?? meta.provider ?? 'unknown';
+    console.log(`Firestore: synced user ${docId} (${data.email}, ${prov})`);
+  } catch (error) {
+    console.warn('Firestore sync failed for', docId, ':', error.message);
+  }
+};
+
 module.exports = {
   initializeFirebase,
   getAuth,
+  getFirestore,
+  syncUserToFirestore,
   verifyIdToken,
   createCustomToken,
   getUserByEmail,

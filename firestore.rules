@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection mirrored from MongoDB via backend admin SDK
+    // Doc ID = Mongo ObjectId string. Admin writes bypass rules.
+    // Client (Flutter) reads/writes allowed only for own account.
+    match /users/{userId} {
+      // Read own doc — match by Firebase UID (Google users) or verified email
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.firebaseUid ||
+        request.auth.token.email == resource.data.email
+      );
+      // Write own doc — same check on incoming data
+      allow create, update: if request.auth != null && (
+        request.auth.uid == request.resource.data.firebaseUid ||
+        request.auth.token.email == request.resource.data.email
+      );
+      allow delete: if false; // only backend should delete
+    }
+  }
+}
