@@ -34,15 +34,20 @@ services:
       # Faster playback — avoid Render killing slow yt-dlp
       - key: REQUEST_TIMEOUT
         value: 90000
-      # Firebase ID-token verification for Google sign-in (public certs, no keys needed).
-      # For Firestore user mirroring, also set FIREBASE_CLIENT_EMAIL + PRIVATE_KEY
-      # (Firebase console > Project settings > Service accounts > Generate new private key).
-      # Without them, users still work in MongoDB but won't appear in Firestore console.
+      # Firebase Auth + Firestore. FIREBASE_PROJECT_ID alone verifies Google
+      # sign-in via public certs. For Firestore user mirroring, pick ONE after
+      # downloading a service-account key (Firebase console > Project settings >
+      # Service accounts > Generate new private key):
+      #   - FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY (split fields), OR
+      #   - FIREBASE_SERVICE_ACCOUNT (paste the whole JSON as the value)
+      # Note: Firestore database must exist — create it in the console first.
       - key: FIREBASE_PROJECT_ID
         value: spotify-ee119
       - key: FIREBASE_CLIENT_EMAIL
         sync: false
       - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
         sync: false
       # YouTube bot-checks Render's datacenter IP on watch-page extraction
       # ("Sign in to confirm you're not a bot"). Paste a Netscape cookies.txt

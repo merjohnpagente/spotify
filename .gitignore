@@ -53,3 +53,8 @@ coverage/
 
 google-services.json
 android/app/google-services.json
+
+# Firebase service-account keys — NEVER commit (private keys)
+serviceAccountKey.json
+*firebase-adminsdk*.json
+*serviceaccount*.json

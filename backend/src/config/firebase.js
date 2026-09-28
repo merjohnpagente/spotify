@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const jwt = require('jsonwebtoken');
+const fs = require('node:fs');
 const https = require('node:https');
 const config = require('./index');
 
@@ -60,24 +61,45 @@ const verifyIdTokenWithPublicCerts = async (idToken) => {
   };
 };
 
+// Service-account sources, first match wins:
+// 1. FIREBASE_SERVICE_ACCOUNT      — raw JSON string (single Render env var)
+// 2. FIREBASE_SERVICE_ACCOUNT_PATH — path to serviceAccountKey.json (local dev;
+//    GOOGLE_APPLICATION_CREDENTIALS is also honored)
+// 3. FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY — split fields (.env)
+const loadServiceAccount = () => {
+  try {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (raw && raw.trim()) return JSON.parse(raw);
+    const p = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (p && fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (error) {
+    console.warn('Firebase service-account JSON unreadable:', error.message);
+  }
+  if (config.firebase.clientEmail && config.firebase.privateKey) {
+    return {
+      projectId: config.firebase.projectId,
+      clientEmail: config.firebase.clientEmail,
+      privateKey: config.firebase.privateKey,
+    };
+  }
+  return null;
+};
+
 const initializeFirebase = () => {
   if (firebaseApp) return firebaseApp;
 
   try {
-    if (!config.firebase.projectId || !config.firebase.clientEmail || !config.firebase.privateKey) {
+    const serviceAccount = loadServiceAccount();
+    if (!serviceAccount) {
       console.warn('Firebase credentials not configured, skipping initialization');
       return null;
     }
 
     firebaseApp = admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: config.firebase.projectId,
-        clientEmail: config.firebase.clientEmail,
-        privateKey: config.firebase.privateKey,
-      }),
+      credential: admin.credential.cert(serviceAccount),
     });
 
-    console.log('Firebase initialized');
+    console.log(`Firebase initialized (${serviceAccount.client_email || serviceAccount.clientEmail || 'service account'})`);
     return firebaseApp;
   } catch (error) {
     console.error('Firebase initialization error:', error);
