@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const config = require('../config');
 
 const songSchema = new mongoose.Schema({
   videoId: {
@@ -89,7 +90,8 @@ songSchema.index({ title: 'text', artist: 'text', album: 'text' });
 songSchema.methods.isAudioCacheValid = function() {
   if (!this.audioUrlCached || !this.audioExtractedAt) return false;
   const cacheAgeHours = (Date.now() - this.audioExtractedAt.getTime()) / (1000 * 60 * 60);
-  return cacheAgeHours < 5; // 5h < googlevideo 6h expiry
+  // Configurable TTL (default 5h) < googlevideo 6h signed-URL expiry.
+  return cacheAgeHours < config.audio.cacheTtlHours;
 };
 
 songSchema.methods.toPublicJSON = function() {

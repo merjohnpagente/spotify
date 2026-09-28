@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const config = require('../config');
 const { Song } = require('../models');
-const { cacheGet, cacheSet } = require('../config/redis');
+const { cacheGet, cacheSet, cacheDelete } = require('../config/redis');
 const { runYtDlp } = require('./youtubeService');
 const audiusService = require('./audiusService');
 const deezerService = require('./deezerService');
@@ -91,15 +91,32 @@ const extractWithFallbacks = async (url) => {
   throw lastError || new Error('Audio extraction failed');
 };
 
+// Circuit breaker: after 2 consecutive full failed runs skip Invidious for
+// 5 minutes — volunteer hosts that are down just add latency to every play.
+let invidiousConsecutiveFails = 0;
+let invidiousDownUntil = 0;
+const INVIDIOUS_BREAKER_MS = 5 * 60 * 1000;
+
+const getInvidiousCircuitState = () => ({
+  open: Date.now() < invidiousDownUntil,
+  consecutiveFails: invidiousConsecutiveFails,
+});
+
+const resetInvidiousCircuit = () => {
+  invidiousConsecutiveFails = 0;
+  invidiousDownUntil = 0;
+};
+
 const fetchViaInvidious = async (videoId) => {
+  if (Date.now() < invidiousDownUntil) return null; // circuit open — fail fast
   // Sorted by uptime 2025-2026: inv.tux.pizza most stable, yewtu.be often 403
   const hosts = ['https://inv.tux.pizza', 'https://vid.puffyan.us', 'https://yewtu.be', 'https://invidious.snopyta.org', 'https://invidious.lunar.icu'];
   for (const host of hosts) {
+    const controller = new AbortController();
+    let t = null;
     try {
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 5000);
+      t = setTimeout(() => controller.abort(), 5000);
       const resp = await fetch(`${host}/api/v1/videos/${videoId}`, { signal: controller.signal });
-      clearTimeout(t);
       if (!resp.ok) continue;
       const data = await resp.json();
       const adaptive = data.adaptiveFormats || [];
@@ -107,10 +124,21 @@ const fetchViaInvidious = async (videoId) => {
       const pick = audio.length ? audio : adaptive;
       if (!pick.length) continue;
       pick.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-      if (pick[0].url) return pick[0].url;
+      if (pick[0].url) {
+        invidiousConsecutiveFails = 0; // success resets the breaker
+        return pick[0].url;
+      }
     } catch (_) {
       continue;
+    } finally {
+      if (t) clearTimeout(t);
     }
+  }
+  // Whole run failed (all hosts down/errors).
+  invidiousConsecutiveFails += 1;
+  if (invidiousConsecutiveFails >= 2) {
+    invidiousDownUntil = Date.now() + INVIDIOUS_BREAKER_MS;
+    console.warn('invidious circuit opened after 2 consecutive failed runs, skipping for 5 min');
   }
   return null;
 };
@@ -189,22 +217,26 @@ const extractAudioUrl = async (videoId) => {
         fetchViaInvidious(videoId).then((u) => { if (!u) throw new Error('invidious empty'); return u; }),
         extractWithFallbacks(url),
       ]);
-      if (audioUrl && audioUrl.includes('googlevideo.com') === false) {
-        // keep as is
-      }
     } catch {
       audioUrl = await fetchViaInvidious(videoId);
       if (!audioUrl) {
         audioUrl = await extractWithFallbacks(url);
-      } else {
+      } else if (audioUrl.includes('googlevideo.com')) {
+        // Remember invidious as winner only for direct googlevideo URLs —
+        // volunteer proxy URLs are transient and shouldn't steer strategy.
         preferredStrategy = 'invidious';
       }
     }
     if (!audioUrl) throw new Error('No audio URL from any source');
 
+    // DoD#4: never persist non-googlevideo (Invidious/proxy) URLs — they
+    // 410 quickly and would poison both Mongo and Redis with dead links.
+    // googlevideo signed URLs are safe for the 5h TTL (below 6h expiry).
+    const isDirectGoogleVideo = audioUrl.includes('googlevideo.com');
+
     // Persisting to MongoDB is best-effort too - never fail playback
     // because the DB write failed.
-    if (isDbReady()) {
+    if (isDirectGoogleVideo && isDbReady()) {
       try {
         await Song.findOneAndUpdate(
           { videoId },
@@ -216,7 +248,9 @@ const extractAudioUrl = async (videoId) => {
       }
     }
 
-    await cacheSet(cacheKey, { url: audioUrl }, AUDIO_CACHE_TTL);
+    if (isDirectGoogleVideo) {
+      await cacheSet(cacheKey, { url: audioUrl }, AUDIO_CACHE_TTL);
+    }
     return audioUrl;
   } catch (error) {
     console.error('Audio extraction error:', error.message);
@@ -234,6 +268,26 @@ const getCachedAudioUrl = async (videoId) => {
     return song.audioUrlCached;
   }
   return null;
+};
+
+// DoD#4: called by the audio proxy on upstream 403/410 (expired signed URL)
+// so the next getSongStreamUrl re-extracts fresh instead of serving dead cache.
+const clearAudioCache = async (videoId) => {
+  try {
+    await cacheDelete(`audio:${videoId}`);
+  } catch (cacheError) {
+    console.warn('Failed to clear redis audio cache:', cacheError.message);
+  }
+  if (isDbReady()) {
+    try {
+      await Song.findOneAndUpdate(
+        { videoId },
+        { audioUrlCached: null, audioExtractedAt: null }
+      );
+    } catch (dbError) {
+      console.warn('MongoDB unavailable while clearing audio cache:', dbError.message);
+    }
+  }
 };
 
 const incrementAccessCount = async (videoId) => {
@@ -256,4 +310,8 @@ module.exports = {
   STRATEGIES,
   getCachedAudioUrl,
   incrementAccessCount,
+  clearAudioCache,
+  fetchViaInvidious,
+  getInvidiousCircuitState,
+  resetInvidiousCircuit,
 };

@@ -23,17 +23,26 @@ jest.mock('../src/services/deezerService', () => ({
   getSongById: jest.fn().mockResolvedValue(null),
 }));
 
-const { cacheGet, cacheSet } = require('../src/config/redis');
+const { cacheGet, cacheSet, cacheDelete } = require('../src/config/redis');
+const mongoose = require('mongoose');
 const { Song } = require('../src/models');
 const { runYtDlp } = require('../src/services/youtubeService');
 const config = require('../src/config');
 const audioService = require('../src/services/audioService');
+
+// Deterministic network: Invidious always loses the race in tests, so
+// Promise.any settles on the mocked yt-dlp (also stops leaked real fetches).
+const fetchSpy = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('no network in tests'));
+
+afterAll(() => fetchSpy.mockRestore());
 
 describe('audioService race + TTL (M5)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     cacheGet.mockResolvedValue(null);
     runYtDlp.mockResolvedValue({ url: 'https://rr3---sn.googlevideo.com/stream' });
+    fetchSpy.mockRejectedValue(new Error('no network in tests'));
+    audioService.resetInvidiousCircuit();
   });
 
   test('AUDIO_CACHE_TTL_HOURS default is 5 (below 6h googlevideo expiry)', () => {
@@ -65,5 +74,102 @@ describe('audioService race + TTL (M5)', () => {
     await audioService.extractAudioUrl('kJQP7kiw5Fk');
     const ttl = cacheSet.mock.calls[0][2];
     expect(ttl).toBe(5 * 60 * 60);
+  });
+});
+
+describe('audioService DoD#4 — no proxy persistence (B2)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    cacheGet.mockResolvedValue(null);
+    fetchSpy.mockRejectedValue(new Error('no network in tests'));
+    audioService.resetInvidiousCircuit();
+  });
+
+  test('non-googlevideo URL is returned but never cached (redis or mongo)', async () => {
+    runYtDlp.mockResolvedValue({ url: 'https://proxy.invidious.example/stream.mp3' });
+    const url = await audioService.extractAudioUrl('kJQP7kiw5Fk');
+    expect(url).toBe('https://proxy.invidious.example/stream.mp3');
+    expect(Song.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
+  test('clearAudioCache wipes redis key and unsets mongo fields', async () => {
+    mongoose.connection.readyState = 1;
+    try {
+      await audioService.clearAudioCache('kJQP7kiw5Fk');
+      expect(cacheDelete).toHaveBeenCalledWith('audio:kJQP7kiw5Fk');
+      expect(Song.findOneAndUpdate).toHaveBeenCalledWith(
+        { videoId: 'kJQP7kiw5Fk' },
+        { audioUrlCached: null, audioExtractedAt: null }
+      );
+    } finally {
+      mongoose.connection.readyState = 0;
+    }
+  });
+
+  test('clearAudioCache never throws when DB is down', async () => {
+    mongoose.connection.readyState = 0;
+    await expect(audioService.clearAudioCache('kJQP7kiw5Fk')).resolves.toBeUndefined();
+    expect(cacheDelete).toHaveBeenCalledWith('audio:kJQP7kiw5Fk');
+    expect(Song.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('audioService invidious circuit breaker (B3)', () => {
+  beforeEach(() => {
+    fetchSpy.mockRejectedValue(new Error('no network in tests'));
+    audioService.resetInvidiousCircuit();
+  });
+
+  afterAll(() => audioService.resetInvidiousCircuit());
+
+  test('opens after 2 consecutive failed runs, then fails fast without network', async () => {
+    expect(audioService.getInvidiousCircuitState().open).toBe(false);
+
+    expect(await audioService.fetchViaInvidious('abc123DEF45')).toBeNull();
+    expect(audioService.getInvidiousCircuitState()).toMatchObject({
+      open: false,
+      consecutiveFails: 1,
+    });
+
+    expect(await audioService.fetchViaInvidious('abc123DEF45')).toBeNull();
+    expect(audioService.getInvidiousCircuitState()).toMatchObject({
+      open: true,
+      consecutiveFails: 2,
+    });
+
+    // Circuit open: no outbound fetches at all.
+    fetchSpy.mockClear();
+    expect(await audioService.fetchViaInvidious('abc123DEF45')).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test('resetInvidiousCircuit re-arms the breaker', async () => {
+    await audioService.fetchViaInvidious('abc123DEF45');
+    await audioService.fetchViaInvidious('abc123DEF45');
+    expect(audioService.getInvidiousCircuitState().open).toBe(true);
+    audioService.resetInvidiousCircuit();
+    expect(audioService.getInvidiousCircuitState()).toMatchObject({
+      open: false,
+      consecutiveFails: 0,
+    });
+  });
+
+  test('a successful run resets the failure counter', async () => {
+    await audioService.fetchViaInvidious('abc123DEF45'); // fail 1
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        adaptiveFormats: [
+          { type: 'audio/mp4; codecs="mp4a.40.2"', url: 'https://googlevideo.com/ok' },
+        ],
+      }),
+    });
+    const url = await audioService.fetchViaInvidious('abc123DEF45');
+    expect(url).toBe('https://googlevideo.com/ok');
+    expect(audioService.getInvidiousCircuitState()).toMatchObject({
+      open: false,
+      consecutiveFails: 0,
+    });
   });
 });

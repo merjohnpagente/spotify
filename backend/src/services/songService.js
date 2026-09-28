@@ -3,7 +3,7 @@ const { Song, UserLike, UserHistory, User } = require('../models');
 const youtubeService = require('./youtubeService');
 const deezerService = require('./deezerService');
 const audiusService = require('./audiusService');
-const { extractAudioUrl, incrementAccessCount } = require('./audioService');
+const { extractAudioUrl, incrementAccessCount, clearAudioCache } = require('./audioService');
 const { cacheGet, cacheSet, cacheDeletePattern } = require('../config/redis');
 
 const isDbReady = () => mongoose.connection.readyState === 1;
@@ -415,6 +415,7 @@ module.exports = {
   getTrendingSongs: getTrendingSongsService,
   getSongById: getSongByIdService,
   getSongStreamUrl,
+  clearAudioCache,
   getRecommendations: getRecommendationsService,
   getSongsByGenre,
   likeSong,

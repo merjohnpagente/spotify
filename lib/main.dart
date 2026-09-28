@@ -13,6 +13,7 @@ import 'package:spotify_fy/providers/providers.dart';
 import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/services/token_store.dart';
 import 'package:spotify_fy/theme.dart';
+import 'package:spotify_fy/utils/toast.dart';
 
 /// Periodically pings the backend /health endpoint to prevent Render free tier
 /// from sleeping (idle >15min = cold start = 30-60s loading on next play).
@@ -60,6 +61,7 @@ class SpotifyApp extends StatelessWidget {
       title: 'Spotify',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       initialRoute: '/',
       routes: {
         '/': (context) => const AuthGate(),
@@ -87,6 +89,15 @@ class _AuthGateState extends ConsumerState<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    // DoD#8: surface messages set by non-UI layers (signed-out like/history).
+    ref.listen<String?>(toastProvider, (previous, next) {
+      if (next == null) return;
+      scaffoldMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(next)));
+      ref.read(toastProvider.notifier).state = null;
+    });
+
     final auth = ref.watch(authProvider);
 
     if (!auth.initialized) {

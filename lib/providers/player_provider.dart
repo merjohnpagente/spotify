@@ -12,6 +12,7 @@ import 'package:spotify_fy/services/direct_audio_service.dart';
 import 'package:spotify_fy/services/music_service.dart';
 import 'package:spotify_fy/services/token_store.dart';
 import 'package:spotify_fy/services/web_audio_service.dart';
+import 'package:spotify_fy/utils/toast.dart';
 
 enum RepeatMode { off, all, one }
 
@@ -92,6 +93,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   final Random _random = Random();
   final Set<String> _likedIds = {};
   bool _reportingHistory = false;
+  bool _historyToastShown = false;
   final DirectAudioService _direct = DirectAudioService();
   final WebAudioService _webDirect = WebAudioService();
 
@@ -468,8 +470,8 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   Future<void> toggleLike() async {
     if (!_tokenStore.hasSession) {
-      // M4 spec: UI should show toast "Sign in to save likes" when hasSession is false.
-      // Keeping silent for now to avoid breaking existing flow (no error state).
+      // DoD#8: actionable toast instead of a silent no-op.
+      _ref.read(toastProvider.notifier).state = 'Sign in to save likes';
       return;
     }
     final song = state.currentSong;
@@ -494,8 +496,12 @@ class PlayerController extends StateNotifier<PlayerState> {
   void _reportHistory() {
     if (_reportingHistory) return;
     if (!_tokenStore.hasSession) {
-      // M4 spec: UI should show toast "Sign in to save history" when hasSession is false.
-      // Keeping silent for now; don't set error to avoid disrupting playback.
+      // DoD#8: toast once per session — _reportHistory fires on every
+      // track end, so showing it every time would spam the user.
+      if (!_historyToastShown) {
+        _historyToastShown = true;
+        _ref.read(toastProvider.notifier).state = 'Sign in to save history';
+      }
       return;
     }
     final song = state.currentSong;
