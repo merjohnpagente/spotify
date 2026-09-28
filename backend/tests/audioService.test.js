@@ -115,6 +115,58 @@ describe('audioService DoD#4 — no proxy persistence (B2)', () => {
   });
 });
 
+describe('audioService failure path (B5) — no double-retry, bot-check bail', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    cacheGet.mockResolvedValue(null);
+    fetchSpy.mockRejectedValue(new Error('no network in tests'));
+    audioService.resetInvidiousCircuit();
+  });
+
+  afterAll(() => audioService.resetInvidiousCircuit());
+
+  const BOT_MSG =
+    'Command failed with exit code 1: yt-dlp https://www.youtube.com/watch?v=x\n' +
+    'ERROR: [youtube] x: Sign in to confirm you\u2019re not a bot. Use --cookies-from-browser';
+
+  test('bot-check on 2 clients bails early instead of burning all 6 strategies', async () => {
+    runYtDlp.mockRejectedValue(new Error(BOT_MSG));
+    await expect(audioService.extractWithFallbacks('https://www.youtube.com/watch?v=x')).rejects.toThrow();
+    expect(runYtDlp).toHaveBeenCalledTimes(2);
+  });
+
+  test('generic errors still try every strategy (no premature bail)', async () => {
+    runYtDlp.mockRejectedValue(new Error('ERROR: format not available'));
+    await expect(audioService.extractWithFallbacks('https://www.youtube.com/watch?v=x')).rejects.toThrow();
+    expect(runYtDlp).toHaveBeenCalledTimes(6); // STRATEGIES.length
+  });
+
+  test('extractAudioUrl does NOT re-run the whole chain after the race rejects', async () => {
+    runYtDlp.mockRejectedValue(new Error(BOT_MSG));
+    await expect(audioService.extractAudioUrl('kJQP7kiw5Fk')).rejects.toThrow('Failed to extract audio');
+    // Old bug: Promise.any catch re-ran fetchViaInvidious + extractWithFallbacks
+    // (+70s). Now each path runs exactly once: 2 yt-dlp calls, no second chain.
+    expect(runYtDlp).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalled(); // invidious side still ran once (raced)
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
+  test('invidious winner is remembered as preferredStrategy when googlevideo', async () => {
+    runYtDlp.mockRejectedValue(new Error('ERROR: generic yt failure'));
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        adaptiveFormats: [
+          { type: 'audio/mp4', bitrate: 128000, url: 'https://rr1---sn.googlevideo.com/v.mp4' },
+        ],
+      }),
+    });
+    const url = await audioService.extractAudioUrl('kJQP7kiw5Fk');
+    expect(url).toContain('googlevideo.com');
+    expect(audioService.getPreferredStrategy()).toBe('invidious');
+  });
+});
+
 describe('audioService invidious circuit breaker (B3)', () => {
   beforeEach(() => {
     fetchSpy.mockRejectedValue(new Error('no network in tests'));

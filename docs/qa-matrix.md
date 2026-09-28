@@ -2,7 +2,10 @@
 
 Record results when running each row. Backend assumed at `http://localhost:3000` (or Render URL for web deploy rows).
 
-> **Status 2026-09-23:** Automated suite green (`flutter analyze` 0, `flutter test` 2/2, `backend npm test` 49/49, `backend npm run lint` clean). **Android debug APK build green** — `flutter build apk --debug` → `build/app/outputs/flutter-apk/app-debug.apk` (157 MB, 2309.7s first-time Gradle 9.1 cold download; subsequent builds much faster). Render `/health` probe **unreachable from this network** (DNS resolves, TCP:443 times out — regional/infra block, GitHub/Cloudflare reachable). Re-run Deploy rows when Render is reachable. Manual device/web walkthrough rows below still need a human on emulator + Chrome.
+> **Status 2026-09-28 12:00–13:30 UTC:**
+> Automated green: `flutter analyze` 0 · `flutter test` 2/2 · `backend npm run lint` clean · `backend npm test` **59/59** (+4 B5) · APK 157 MB (debug). **Render reachable now** — `/health` 200 (`uptime` 600→2357s), `/api/status` 200 (`database: connected`), `/api/songs/trending?limit=3` 200 (cached results, e.g. `au_NQwXON0`). Earlier Render cold-start DNS timeout (175.176.85.240 → 216.24.57.16) was transient, now resolved.
+> **DoD#5 probes:** local `yt-dlp.exe` direct 3/3 before throttling (`kJQP7kiw5Fk` Despacito, `hLQl3WQQoQ0` Adele, `dQw4w9WgXcQ` Rick Astley each returned JSON). Local server `GET /api/debug/ytdlp?strategy=android` timed 15–18s with `yt-dlp timed out` — YouTube throttled after burst of 7+ calls in 30 min (even `ytsearch1:adele hello` hung). Prod `GET /api/debug/ytdlp?strategy=android|ios|mweb|tv_embedded|web_embedded` all bot-check on Render datacenter IP (`Sign in to confirm you're not a bot. Use --cookies...`) — needs `YOUTUBE_COOKIES` env (added to `render.yaml` sync:false). All 5 Invidious hosts timeout from this network (breaker opens after 2 fails — B3 working). **App impact limited:** Android/iOS play via on-device `youtube_explode_dart` (primary, ~1s, residential IP) before server fallback — B5 fix removes double-retry (+70s) and bails on 2 bot-checks (~30s saved), so fail-fast → direct path.
+> **B5 fix landed:** `extractWithFallbacks` bot-check early-bail (2 streak), `extractAudioUrl` no second chain after `Promise.any` rejects, invidious winner `preferredStrategy='invidious'` only for googlevideo. **Next:** set `YOUTUBE_COOKIES` in Render dashboard (export Netscape cookies.txt), then re-run prod `GET /api/debug/ytdlp` for 3 ids (expect `stream: ok` <15s). Manual emulator/web rows still need human walkthrough.
 
 ## Android emulator (`flutter run`, API base `http://10.0.2.2:3000`)
 
@@ -48,7 +51,7 @@ Expect `stream: ok (...ms)` for all three videoIds (spec DoD #5).
 
 ## Automated (run before every milestone commit)
 
-- `flutter analyze --no-pub` → 0 issues
-- `flutter test --no-pub` → pass
-- `cd backend && npm run lint` → clean
-- `cd backend && npm test` → pass
+- `flutter analyze --no-pub` → 0 issues (2026-09-28)
+- `flutter test --no-pub` → 2/2 (2026-09-28)
+- `cd backend && npm run lint` → clean (2026-09-28)
+- `cd backend && npm test` → 59/59 (2026-09-28, incl. B2/B3/B5)

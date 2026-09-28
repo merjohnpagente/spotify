@@ -64,6 +64,11 @@ const extractWithStrategy = async (url, strategyLabel, timeoutMs = 15000) => {
   return audioUrl;
 };
 
+// YouTube's datacenter-IP bot-check ("Sign in to confirm you're not a bot")
+// fails EVERY player client the same way — burning 15s x remaining strategies
+// (up to 45s) just re-proves the same block. Bail after 2 consecutive hits.
+const BOT_CHECK_RE = /sign in to confirm you[’']?re not a bot|use --cookies/i;
+
 const extractWithFallbacks = async (url) => {
   // Hard deadline 60s so Render (30s proxy timeout is increased) + client 90s always wins.
   // With android first, most videos succeed in 5-10s, no 25s waste on failing default.
@@ -76,6 +81,7 @@ const extractWithFallbacks = async (url) => {
     : STRATEGIES;
 
   let lastError = null;
+  let botCheckStreak = 0;
   for (const strategy of order) {
     if (Date.now() > deadline - 15000) break;
     try {
@@ -83,6 +89,17 @@ const extractWithFallbacks = async (url) => {
       return audioUrl;
     } catch (error) {
       lastError = error;
+      if (BOT_CHECK_RE.test(String(error.message))) {
+        botCheckStreak += 1;
+        if (botCheckStreak >= 2) {
+          console.warn(
+            `stream: bot-check confirmed on ${botCheckStreak} clients — skipping remaining strategies`
+          );
+          break;
+        }
+      } else {
+        botCheckStreak = 0;
+      }
       console.warn(
         `stream strategy "${strategy.label}" failed: ${String(error.message).split('\n')[0]}`
       );
@@ -206,26 +223,34 @@ const extractAudioUrl = async (videoId) => {
   }
 
   try {
-    // YouTube fallback: race Audius search for title vs yt-dlp (keeps old behavior for yt IDs)
-    // For dz/au we already returned, so this is YouTube 11-char path
+    // YouTube 11-char path: race Invidious (5s/host) vs yt-dlp strategy chain.
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    // Try Audius search by videoId text as last fast attempt before slow yt-dlp
     let audioUrl = null;
-    // For dz/au we already returned, so only yt path races Invidious+yt-dlp
+    let invidiousWon = false;
+    let lastExtractionError = null;
     try {
       audioUrl = await Promise.any([
-        fetchViaInvidious(videoId).then((u) => { if (!u) throw new Error('invidious empty'); return u; }),
-        extractWithFallbacks(url),
+        fetchViaInvidious(videoId).then((u) => {
+          if (!u) throw new Error('invidious empty');
+          invidiousWon = true;
+          return u;
+        }),
+        extractWithFallbacks(url).catch((e) => {
+          lastExtractionError = e;
+          throw e;
+        }),
       ]);
     } catch {
-      audioUrl = await fetchViaInvidious(videoId);
-      if (!audioUrl) {
-        audioUrl = await extractWithFallbacks(url);
-      } else if (audioUrl.includes('googlevideo.com')) {
-        // Remember invidious as winner only for direct googlevideo URLs —
-        // volunteer proxy URLs are transient and shouldn't steer strategy.
-        preferredStrategy = 'invidious';
-      }
+      // Promise.any rejected only after BOTH paths already ran once. The old
+      // code re-ran them sequentially here (+70s) — past the client's 90s
+      // timeout and Render's REQUEST_TIMEOUT, which looked like a hang.
+      // Fail fast instead; the app already falls back to on-device playback.
+      throw lastExtractionError || new Error('No audio URL from any source');
+    }
+    if (invidiousWon && audioUrl.includes('googlevideo.com')) {
+      // Remember invidious as winner only for direct googlevideo URLs —
+      // volunteer proxy URLs are transient and shouldn't steer strategy.
+      preferredStrategy = 'invidious';
     }
     if (!audioUrl) throw new Error('No audio URL from any source');
 

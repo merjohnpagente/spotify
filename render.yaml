@@ -37,3 +37,9 @@ services:
       # Firebase ID-token verification for Google sign-in (public certs, no keys needed).
       - key: FIREBASE_PROJECT_ID
         value: spotify-ee119
+      # YouTube bot-checks Render's datacenter IP on watch-page extraction
+      # ("Sign in to confirm you're not a bot"). Paste a Netscape cookies.txt
+      # exported from a logged-in browser to lift it — see backend/.env.example.
+      # Without it, /api/debug/ytdlp fails on prod (app still plays on-device).
+      - key: YOUTUBE_COOKIES
+        sync: false
