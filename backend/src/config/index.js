@@ -43,11 +43,6 @@ module.exports = {
   redis: {
     url: process.env.REDIS_URL,
   },
-
-  // Jamendo free music API (publicapis.io/jamendo-api) — optional third source.
-  jamendo: {
-    clientId: process.env.JAMENDO_CLIENT_ID,
-  },
   
   mailgun: {
     apiKey: process.env.MAILGUN_API_KEY,

@@ -55,7 +55,3 @@ services:
       # Without it, /api/debug/ytdlp fails on prod (app still plays on-device).
       - key: YOUTUBE_COOKIES
         sync: false
-      # Jamendo free music API — optional 4th source (legal CC tracks, no
-      # bot-checks). Free client_id: https://devportal.jamendo.com
-      - key: JAMENDO_CLIENT_ID
-        sync: false

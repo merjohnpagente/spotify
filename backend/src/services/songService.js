@@ -3,7 +3,6 @@ const { Song, UserLike, UserHistory, User } = require('../models');
 const youtubeService = require('./youtubeService');
 const deezerService = require('./deezerService');
 const audiusService = require('./audiusService');
-const jamendoService = require('./jamendoService');
 const { extractAudioUrl, incrementAccessCount, clearAudioCache } = require('./audioService');
 const { cacheGet, cacheSet, cacheDeletePattern } = require('../config/redis');
 
@@ -31,7 +30,7 @@ const upsertSong = async (ytData) => {
     id: null,
     isAvailable: true,
     addedToSystemAt: new Date(),
-    source: ytData.source || (ytData.videoId && ytData.videoId.startsWith('dz_') ? 'deezer' : ytData.videoId && ytData.videoId.startsWith('au_') ? 'audius' : ytData.videoId && ytData.videoId.startsWith('jm_') ? 'jamendo' : 'youtube'),
+    source: ytData.source || (ytData.videoId && ytData.videoId.startsWith('dz_') ? 'deezer' : ytData.videoId && ytData.videoId.startsWith('au_') ? 'audius' : 'youtube'),
     isPreview: ytData.isPreview ?? (ytData.videoId && ytData.videoId.startsWith('dz_')),
     ...ytData,
   };
@@ -61,15 +60,10 @@ const resolveSongById = async (videoId) => {
     if (au.length && au[0].videoId === videoId) return au[0];
     // fallback: fetch via Audius trending search?
   }
-  if (videoId.startsWith('jm_')) {
-    const jm = await jamendoService.getSongById(videoId);
-    if (jm) return jm;
-    return null; // never a YouTube id
-  }
   // Legacy YouTube 11-char or numeric fallback
   const yt = await youtubeService.getSongById(videoId);
   if (yt) return yt;
-  if (videoId.startsWith('dz_') || videoId.startsWith('au_') || videoId.startsWith('jm_')) return null;
+  if (videoId.startsWith('dz_') || videoId.startsWith('au_')) return null;
   // Try Deezer numeric without prefix
   if (/^\d+$/.test(videoId)) {
     const dz2 = await deezerService.getSongById(`dz_${videoId}`);
@@ -112,16 +106,15 @@ const searchSongsService = async (query, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  // Hybrid FAST: Audius+Deezer+Jamendo parallel (8s abort each), only YouTube if still thin — fixes "dugay loading"
+  // Hybrid FAST: Audius+Deezer parallel (800ms), only YouTube if still thin — fixes "dugay loading"
   let results = [];
   try {
-    const [audiusResults, deezerResults, jamendoResults] = await Promise.all([
+    const [audiusResults, deezerResults] = await Promise.all([
       audiusService.searchSongs(query, limit).catch(() => []),
       deezerService.searchSongs(query, limit).catch(() => []),
-      jamendoService.searchSongs(query, limit).catch(() => []),
     ]);
     const seen = new Set();
-    for (const bucket of [audiusResults, deezerResults, jamendoResults]) {
+    for (const bucket of [audiusResults, deezerResults]) {
       for (const s of bucket) {
         if (!seen.has(s.videoId) && results.length < limit) {
           seen.add(s.videoId);
@@ -157,13 +150,12 @@ const getTrendingSongsService = async (limit = 30) => {
 
   let results = [];
   try {
-    const [audiusTrending, deezerTrending, jamendoTrending] = await Promise.all([
+    const [audiusTrending, deezerTrending] = await Promise.all([
       audiusService.getTrendingSongs(limit).catch(() => []),
       deezerService.getTrendingSongs(limit).catch(() => []),
-      jamendoService.getTrendingSongs(limit).catch(() => []),
     ]);
     const seen = new Set();
-    for (const bucket of [audiusTrending, deezerTrending, jamendoTrending]) {
+    for (const bucket of [audiusTrending, deezerTrending]) {
       for (const s of bucket) {
         if (!seen.has(s.videoId) && results.length < limit) {
           seen.add(s.videoId);
@@ -251,13 +243,12 @@ const getSongsByGenre = async (genre, limit = 20) => {
 
   let results = [];
   try {
-    const [audiusResults, deezerResults, jamendoResults] = await Promise.all([
+    const [audiusResults, deezerResults] = await Promise.all([
       audiusService.searchSongs(`${genre} music`, limit).catch(() => []),
       deezerService.searchSongs(`${genre} music`, limit).catch(() => []),
-      jamendoService.searchSongs(`${genre} music`, limit).catch(() => []),
     ]);
     const seen = new Set();
-    for (const bucket of [audiusResults, deezerResults, jamendoResults]) {
+    for (const bucket of [audiusResults, deezerResults]) {
       for (const s of bucket) if (!seen.has(s.videoId) && results.length < limit) { seen.add(s.videoId); results.push(s); }
     }
     if (!results.length) {

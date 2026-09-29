@@ -110,7 +110,7 @@ songSchema.methods.toPublicJSON = function() {
     explicit: this.explicit,
     isAvailable: this.isAvailable,
     addedToSystemAt: this.addedToSystemAt,
-    source: this.source || (this.videoId && this.videoId.startsWith('dz_') ? 'deezer' : this.videoId && this.videoId.startsWith('au_') ? 'audius' : this.videoId && this.videoId.startsWith('jm_') ? 'jamendo' : 'youtube'),
+    source: this.source || (this.videoId && this.videoId.startsWith('dz_') ? 'deezer' : this.videoId && this.videoId.startsWith('au_') ? 'audius' : 'youtube'),
     isPreview: this.isPreview || (this.videoId && this.videoId.startsWith('dz_')),
   };
 };

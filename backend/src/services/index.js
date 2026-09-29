@@ -6,7 +6,6 @@ const imageService = require('./imageService');
 const songService = require('./songService');
 const playlistService = require('./playlistService');
 const userService = require('./userService');
-const jamendoService = require('./jamendoService');
 
 module.exports = {
   auth: authService,
@@ -17,5 +16,4 @@ module.exports = {
   song: songService,
   playlist: playlistService,
   user: userService,
-  jamendo: jamendoService,
 };
