@@ -5,6 +5,7 @@ const { cacheGet, cacheSet, cacheDelete } = require('../config/redis');
 const { runYtDlp } = require('./youtubeService');
 const audiusService = require('./audiusService');
 const deezerService = require('./deezerService');
+const jamendoService = require('./jamendoService');
 
 const isDbReady = () => mongoose.connection.readyState === 1;
 
@@ -165,7 +166,8 @@ const extractAudioUrl = async (videoId) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached.url;
 
-  // Fast path: Audius (no bot block, <2s) and Deezer preview (30s) before YouTube
+  // Fast path: Audius (no bot block, <2s), Deezer preview (30s), Jamendo full
+  // track (legal CC mp3) before YouTube — all run before the yt-dlp race.
   if (videoId.startsWith('au_')) {
     const auUrl = await audiusService.getStreamUrl(videoId);
     if (auUrl) {
@@ -205,6 +207,15 @@ const extractAudioUrl = async (videoId) => {
       await cacheSet(cacheKey, { url: dzUrl }, AUDIO_CACHE_TTL);
       return dzUrl;
     }
+  }
+  if (videoId.startsWith('jm_')) {
+    // Jamendo: stable CDN mp3 — safe to cache for the full TTL.
+    const jmUrl = await jamendoService.getStreamUrl(videoId);
+    if (jmUrl) {
+      await cacheSet(cacheKey, { url: jmUrl }, AUDIO_CACHE_TTL);
+      return jmUrl;
+    }
+    throw new Error('No audio URL from any source'); // jm_ ids never resolve via YouTube
   }
 
   // MongoDB read is best-effort: if the DB is unavailable we still
