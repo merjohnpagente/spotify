@@ -13,6 +13,7 @@ import 'package:spotify_fy/tabs/home_tab.dart';
 import 'package:spotify_fy/tabs/search_tab.dart';
 import 'package:spotify_fy/tabs/library_tab.dart';
 import 'package:spotify_fy/tabs/profile_tab.dart';
+import 'package:spotify_fy/tabs/coming_soon_tab.dart';
 import 'package:spotify_fy/views/player_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -32,6 +33,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
     SearchTab(),
     LibraryTab(),
     ProfileTab(),
+    ComingSoonTab(),
   ];
 
   @override
@@ -194,6 +196,10 @@ class _MainScreenState extends ConsumerState<MainScreen> with TickerProviderStat
           BottomNavigationBarItem(
             icon: Icon(Icons.person, size: 24),
             label: 'Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.upcoming, size: 24),
+            label: 'Coming',
           ),
         ],
       ),

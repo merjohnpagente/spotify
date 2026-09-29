@@ -1,0 +1,13 @@
+{
+  "name": "spotify-fy-rules-tests",
+  "private": true,
+  "type": "module",
+  "description": "Firestore security-rules tests against the local emulator (run via `firebase emulators:exec`) — see README note in repo docs.",
+  "scripts": {
+    "test": "cd .. && firebase emulators:exec --only firestore --project demo-spotifyfy \"node rules-tests/run.cjs\""
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.0.0"
+  }
+}

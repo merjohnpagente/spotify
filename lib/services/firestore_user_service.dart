@@ -16,6 +16,14 @@ class FirestoreUserService {
     try {
       final db = FirebaseFirestore.instance;
       final fbUser = FirebaseAuth.instance.currentUser;
+      // Email/password accounts have no Firebase Auth session, so security
+      // rules deny the write (request.auth == null) — skip the guaranteed
+      // failure. The backend admin-SDK mirror already covers those users;
+      // only Google users (signInWithCredential) have a session to write with.
+      if (fbUser == null) {
+        debugPrint('Firestore client sync skipped (no Firebase session): ${user.id}');
+        return;
+      }
       await db.collection('users').doc(user.id).set(
         {
           'id': user.id,
@@ -28,8 +36,8 @@ class FirestoreUserService {
           'preferences': user.preferences,
           'stats': user.stats,
           'updatedAt': FieldValue.serverTimestamp(),
-          'provider': fbUser != null ? 'google' : 'email',
-          if (fbUser != null) 'firebaseUid': fbUser.uid,
+          'provider': 'google',
+          'firebaseUid': fbUser.uid,
           if (user.createdAt != null) 'createdAt': Timestamp.fromDate(user.createdAt!),
         },
         SetOptions(merge: true),
