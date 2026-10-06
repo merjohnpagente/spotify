@@ -5,8 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/validators.dart';
 import 'package:spotify_fy/widgets/app_input_field.dart';
+import 'package:spotify_fy/widgets/google_mark.dart';
 import 'package:spotify_fy/widgets/sign_in_button.dart';
 import 'package:spotify_fy/widgets/social_button.dart';
+import 'package:spotify_fy/auth/forgot_password_screen.dart';
 import 'package:spotify_fy/auth/register_screen.dart';
 import 'package:spotify_fy/providers/providers.dart';
 
@@ -48,6 +50,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const SizedBox(height: 32),
+                    Image.asset(
+                      'assets/images/spotify.png',
+                      height: 76,
+                      semanticLabel: 'Spotify logo',
+                    ),
+                    const SizedBox(height: 16),
                     const Text(
                       'Spotify',
                       style: TextStyle(
@@ -104,8 +112,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Password reset — coming soon')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ForgotPasswordScreen(),
+                            ),
                           );
                         },
                         child: const Text(
@@ -143,7 +154,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 24),
                     SocialButton(
                       text: 'Continue with Google',
-                      icon: Icons.g_mobiledata,
+                      leading: const GoogleMark(),
                       onPressed: _handleGoogleSignIn,
                       loading: _isGoogleLoading,
                     ),
@@ -215,7 +226,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: SpotifyColors.cardBackground,
+        backgroundColor: SpotifyColors.errorBackground,
       ),
     );
   }

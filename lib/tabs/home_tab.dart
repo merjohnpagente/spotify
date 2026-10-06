@@ -5,7 +5,10 @@ import 'package:spotify_fy/providers/music_providers.dart';
 import 'package:spotify_fy/services/api_client.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/player_nav.dart';
+import 'package:spotify_fy/utils/route_transitions.dart';
 import 'package:spotify_fy/utils/scroll_registry.dart';
+import 'package:spotify_fy/views/notifications_screen.dart';
+import 'package:spotify_fy/views/settings_screen.dart';
 import 'package:spotify_fy/widgets/song_card.dart';
 import 'package:spotify_fy/widgets/shimmer.dart';
 
@@ -44,10 +47,12 @@ class _HomeTabState extends ConsumerState<HomeTab> {
     return 'Good Evening';
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$feature — coming soon')));
+  void _openNotifications() {
+    pushFade(context, const NotificationsScreen());
+  }
+
+  void _openSettings() {
+    pushFade(context, const SettingsScreen());
   }
 
   void _playSong(BuildContext context, List<Song> queue, int index) {
@@ -77,7 +82,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               size: 28,
             ),
             tooltip: 'Notifications',
-            onPressed: () => _showComingSoon('Notifications'),
+            onPressed: _openNotifications,
           ),
           IconButton(
             icon: const Icon(
@@ -86,7 +91,7 @@ class _HomeTabState extends ConsumerState<HomeTab> {
               size: 28,
             ),
             tooltip: 'Settings',
-            onPressed: () => _showComingSoon('Settings — see Profile tab'),
+            onPressed: _openSettings,
           ),
         ],
       ),

@@ -8,7 +8,7 @@ class AppInputField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final String hint;
-  final IconData icon;
+  final IconData? icon;
   final TextInputType? keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
@@ -19,7 +19,7 @@ class AppInputField extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.hint,
-    required this.icon,
+    this.icon,
     this.keyboardType,
     this.obscureText = false,
     this.suffixIcon,
@@ -48,7 +48,9 @@ class AppInputField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: SpotifyColors.textSecondary, fontSize: 16),
-            prefixIcon: Icon(icon, color: SpotifyColors.textSecondary, size: 24),
+            prefixIcon: icon == null
+                ? null
+                : Icon(icon, color: SpotifyColors.textSecondary, size: 24),
             suffixIcon: suffixIcon,
             filled: true,
             fillColor: SpotifyColors.secondaryBackground,

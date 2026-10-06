@@ -4,14 +4,14 @@ import 'package:spotify_fy/theme.dart';
 class SocialButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final String text;
-  final IconData icon;
+  final Widget leading;
   final bool loading;
 
   const SocialButton({
     super.key,
     required this.onPressed,
     required this.text,
-    required this.icon,
+    required this.leading,
     this.loading = false,
   });
 
@@ -40,7 +40,7 @@ class SocialButton extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2.5),
               )
             else ...[
-              Icon(icon, color: SpotifyColors.textSecondary, size: 24),
+              leading,
               const SizedBox(width: 16),
               Text(
                 text,

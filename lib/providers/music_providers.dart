@@ -51,3 +51,58 @@ final listeningHistoryProvider = FutureProvider.autoDispose<List<Song>>((ref) as
 final userStatsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
   return ref.watch(musicServiceProvider).stats();
 });
+
+/// Podcasts: real results from YouTube search — no backend change needed.
+/// Merges a few podcast-flavoured queries and dedupes by videoId.
+final podcastsProvider = FutureProvider.autoDispose<List<Song>>((ref) async {
+  final music = ref.watch(musicServiceProvider);
+  final queries = ['podcasts', 'talk show', 'podcast pinoy'];
+  final seen = <String>{};
+  final merged = <Song>[];
+  for (final q in queries) {
+    try {
+      final results = await music.search(q, limit: 15);
+      for (final s in results) {
+        if (seen.add(s.videoId)) merged.add(s);
+      }
+    } catch (_) {
+      // One query failing should not kill the whole screen.
+    }
+  }
+  return merged;
+});
+
+/// Smart Mix ("AI DJ" v1): builds a personal mix from liked + history +
+/// trending, then fills with recommendations. All client-side.
+final djMixProvider = FutureProvider.autoDispose<List<Song>>((ref) async {
+  final music = ref.watch(musicServiceProvider);
+  final seen = <String>{};
+  final mix = <Song>[];
+
+  void addAll(List<Song> songs) {
+    for (final s in songs) {
+      if (seen.add(s.videoId)) mix.add(s);
+    }
+  }
+
+  try {
+    addAll(await music.likedSongs(limit: 30));
+  } catch (_) {}
+  try {
+    final history = await music.history(limit: 30);
+    addAll(history.map(Song.fromJson).toList());
+  } catch (_) {}
+  try {
+    addAll(await music.trending(limit: 20));
+  } catch (_) {}
+
+  mix.shuffle();
+  // Fill with recommendations seeded from the first few tracks.
+  for (var i = 0; i < mix.length && mix.length < 25 && i < 5; i++) {
+    try {
+      final recs = await music.recommendations(mix[i].videoId, limit: 6);
+      addAll(recs);
+    } catch (_) {}
+  }
+  return mix.take(25).toList();
+});

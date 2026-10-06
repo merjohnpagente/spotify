@@ -8,6 +8,7 @@ import 'package:spotify_fy/utils/route_transitions.dart';
 import 'package:spotify_fy/utils/scroll_registry.dart';
 import 'package:spotify_fy/utils/preference_labels.dart';
 import 'package:spotify_fy/views/history_screen.dart';
+import 'package:spotify_fy/views/legal_screen.dart';
 import 'package:spotify_fy/views/settings_screen.dart';
 import 'package:spotify_fy/views/stats_screen.dart';
 
@@ -272,21 +273,13 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy Policy',
             trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Privacy Policy — coming soon')),
-              );
-            },
+            onTap: () => pushFade(context, const PrivacyPolicyScreen()),
           ),
           _buildSettingTile(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
             trailing: const Icon(Icons.chevron_right, color: SpotifyColors.textSecondary),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Terms of Service — coming soon')),
-              );
-            },
+            onTap: () => pushFade(context, const TermsOfServiceScreen()),
           ),
           const SizedBox(height: 48),
           SizedBox(

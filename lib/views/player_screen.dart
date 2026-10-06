@@ -1,10 +1,15 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide RepeatMode;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:spotify_fy/models/song.dart';
 import 'package:spotify_fy/providers/player_provider.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/views/queue_screen.dart';
+import 'package:spotify_fy/widgets/lyrics_sheet.dart';
+import 'package:spotify_fy/widgets/song_options_sheet.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -50,9 +55,92 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     return '$minutes:$secs';
   }
 
-  void _showComingSoon(String feature) {
+  void _showDevicesSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SpotifyColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: SpotifyColors.textSecondary.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Connect to a device',
+                  style: TextStyle(
+                    color: SpotifyColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Icon(
+                  kIsWeb ? Icons.laptop : Icons.smartphone,
+                  color: SpotifyColors.primaryAccent,
+                  size: 28,
+                ),
+                title: Text(
+                  kIsWeb ? 'Web Player' : 'This device',
+                  style: const TextStyle(
+                    color: SpotifyColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Currently playing',
+                  style: TextStyle(
+                    color: SpotifyColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.check_circle,
+                  color: SpotifyColors.primaryAccent,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Text(
+                  'Playback stays on this device. Multi-device handoff is on the roadmap.',
+                  style: TextStyle(
+                    color: SpotifyColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareSong(Song? song) async {
+    if (song == null) return;
+    final text = (song.source == 'youtube' && song.videoId.isNotEmpty)
+        ? 'https://youtu.be/${song.videoId}'
+        : '${song.title} — ${song.artist}';
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature — coming soon')),
+      const SnackBar(content: Text('Link copied to clipboard')),
     );
   }
 
@@ -85,11 +173,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   IconButton(
                     icon: const Icon(Icons.more_vert, color: SpotifyColors.textPrimary, size: 28),
                     tooltip: 'More options',
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('More options — coming soon')),
-                      );
-                    },
+                    onPressed: song == null
+                        ? null
+                        : () => showSongOptions(context, ref, song),
                   ),
                 ],
               ),
@@ -368,17 +454,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                           _buildBottomActionButton(
                             Icons.devices,
                             'Devices',
-                            onTap: () => _showComingSoon('Devices'),
+                            onTap: _showDevicesSheet,
                           ),
                           _buildBottomActionButton(
                             Icons.share,
                             'Share',
-                            onTap: () => _showComingSoon('Share'),
+                            onTap: song == null ? null : () => _shareSong(song),
                           ),
                           _buildBottomActionButton(
                             Icons.lyrics,
                             'Lyrics',
-                            onTap: () => _showComingSoon('Lyrics'),
+                            onTap: song == null
+                                ? null
+                                : () => showLyricsSheet(context, song),
                           ),
                           _buildBottomActionButton(
                             Icons.queue_music,

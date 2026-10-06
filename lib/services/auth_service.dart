@@ -63,8 +63,22 @@ class AuthService {
     }
   }
 
-  Future<UserProfile> me() async {
-    final data = await _api.get('/api/auth/me');
+  /// Requests a password-reset email. The backend always returns a generic
+  /// message so accounts can't be enumerated.
+  Future<String> forgotPassword({required String email}) async {
+    final data = await _api.post(
+      '/api/auth/forgot-password',
+      body: {'email': email},
+      auth: false,
+    );
+    if (data is Map<String, dynamic>) {
+      final message = data['message'] as String?;
+      if (message != null && message.isNotEmpty) return message;
+    }
+    return 'If the email exists, a reset link has been sent';
+  }
+
+  Future<UserProfile> me() async {    final data = await _api.get('/api/auth/me');
     return UserProfile.fromJson(data as Map<String, dynamic>);
   }
 

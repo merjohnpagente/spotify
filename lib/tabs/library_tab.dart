@@ -8,6 +8,7 @@ import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/route_transitions.dart';
 import 'package:spotify_fy/utils/scroll_registry.dart';
 import 'package:spotify_fy/views/liked_songs_screen.dart';
+import 'package:spotify_fy/views/downloads_screen.dart';
 import 'package:spotify_fy/views/playlist_detail_screen.dart';
 import 'package:spotify_fy/widgets/library_item.dart';
 import 'package:spotify_fy/widgets/playlist_item.dart';
@@ -93,11 +94,7 @@ class _LibraryTabState extends ConsumerState<LibraryTab> {
               title: 'Downloaded',
               subtitle: 'Offline playback',
               iconColor: SpotifyColors.primaryAccent,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Offline downloads — coming soon')),
-                );
-              },
+              onTap: () => pushFade(context, const DownloadsScreen()),
             ),
             const SizedBox(height: 24),
             const Text(

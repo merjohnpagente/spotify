@@ -8,6 +8,7 @@ class SpotifyColors {
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB3B3B3);
   static const Color dividerColor = Colors.white10;
+  static const Color errorBackground = Color(0xFFB3261E);
 }
 
 class AppTheme {

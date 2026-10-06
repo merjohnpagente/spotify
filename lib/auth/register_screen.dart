@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotify_fy/theme.dart';
 import 'package:spotify_fy/utils/validators.dart';
 import 'package:spotify_fy/widgets/app_input_field.dart';
+import 'package:spotify_fy/widgets/google_mark.dart';
 import 'package:spotify_fy/widgets/sign_in_button.dart';
+import 'package:spotify_fy/widgets/social_button.dart';
 import 'package:spotify_fy/providers/providers.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -24,6 +26,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
+  bool _isGoogleLoading = false;
 
   @override
   void dispose() {
@@ -84,7 +87,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         controller: _firstNameController,
                         label: 'First Name',
                         hint: 'John',
-                        icon: Icons.badge_outlined,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'First name required';
@@ -99,7 +101,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         controller: _lastNameController,
                         label: 'Last Name',
                         hint: 'Doe',
-                        icon: Icons.badge_outlined,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Last name required';
@@ -189,13 +190,38 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   onPressed: _handleRegister,
                   loading: _isSubmitting,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
+                    const Expanded(child: Divider(color: SpotifyColors.dividerColor)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'OR',
+                        style: const TextStyle(
+                          color: SpotifyColors.textSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: SpotifyColors.dividerColor)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                SocialButton(
+                  text: 'Continue with Google',
+                  leading: const GoogleMark(),
+                  onPressed: _handleGoogleSignIn,
+                  loading: _isGoogleLoading,
+                ),
+                const SizedBox(height: 32),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
                       'Already have an account? ',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: SpotifyColors.textSecondary,
                         fontSize: 14,
                       ),
@@ -204,6 +230,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onPressed: () {
                         Navigator.pop(context);
                       },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       child: const Text(
                         'Sign In',
                         style: TextStyle(
@@ -247,9 +278,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
-          backgroundColor: SpotifyColors.cardBackground,
+          backgroundColor: SpotifyColors.errorBackground,
         ),
       );
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (_isGoogleLoading) return;
+    setState(() => _isGoogleLoading = true);
+
+    final success = await ref.read(authProvider.notifier).signInWithGoogle();
+
+    if (!mounted) return;
+    setState(() => _isGoogleLoading = false);
+
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      // error == null means the user cancelled the Google dialog - stay quiet.
+      final error = ref.read(authProvider).error;
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: SpotifyColors.errorBackground,
+          ),
+        );
+      }
     }
   }
 }
