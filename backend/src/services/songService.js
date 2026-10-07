@@ -23,6 +23,34 @@ const CACHE_TTL = {
   RECOMMENDATIONS: 24 * 60 * 60,
 };
 
+// YouTube yt-dlp search is slow on free-tier hosts (5-15s), but it is the
+// ONLY source of full-length songs. Deezer (`dz_`) is always a 30s preview,
+// so YouTube + Audius (full tracks) must come first and Deezer only fills
+// gaps — otherwise search/playback is all 30s previews.
+const YT_SEARCH_TIMEOUT_MS = 15000;
+
+// Race a promise against a timeout so a slow source never blocks search.
+const withTimeout = (promise, ms, fallback = []) =>
+  Promise.race([
+    promise,
+    new Promise((res) => setTimeout(() => res(fallback), ms)),
+  ]);
+
+// Merge source buckets in priority order, deduped by videoId, up to limit.
+const mergeDedupe = (buckets, limit) => {
+  const seen = new Set();
+  const out = [];
+  for (const bucket of buckets) {
+    for (const s of bucket || []) {
+      if (s && s.videoId && !seen.has(s.videoId) && out.length < limit) {
+        seen.add(s.videoId);
+        out.push(s);
+      }
+    }
+  }
+  return out;
+};
+
 // Persist a YouTube song in MongoDB; if the DB is unavailable, degrade
 // gracefully and serve the YouTube data directly so music keeps playing.
 const upsertSong = async (ytData) => {
@@ -106,36 +134,21 @@ const searchSongsService = async (query, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  // Hybrid FAST: Audius+Deezer parallel (800ms), only YouTube if still thin — fixes "dugay loading"
-  let results = [];
-  try {
-    const [audiusResults, deezerResults] = await Promise.all([
-      audiusService.searchSongs(query, limit).catch(() => []),
-      deezerService.searchSongs(query, limit).catch(() => []),
-    ]);
-    const seen = new Set();
-    for (const bucket of [audiusResults, deezerResults]) {
-      for (const s of bucket) {
-        if (!seen.has(s.videoId) && results.length < limit) {
-          seen.add(s.videoId);
-          results.push(s);
-        }
-      }
-    }
-    // Only call slow YouTube yt-dlp if still thin (<5 results) — with 4s timeout so search never blocks
-    if (results.length < Math.min(limit, 5)) {
-      try {
-        const ytResults = await Promise.race([
-          youtubeService.searchSongs(query, limit),
-          new Promise((res) => setTimeout(() => res([]), 4000)),
-        ]);
-        const ytSeen = new Set(results.map(r => r.videoId));
-        for (const s of (ytResults || [])) {
-          if (!ytSeen.has(s.videoId) && results.length < limit) results.push(s);
-        }
-      } catch (_) { /* ignore */ }
-    }
-  } catch (_) { /* ignore */ }
+  // YouTube FIRST (full songs) + Audius (full tracks) in parallel, Deezer
+  // 30s previews only as last fill to reach `limit`.
+  const [ytResults, audiusResults, deezerResults] = await Promise.all([
+    withTimeout(
+      youtubeService.searchSongs(query, limit).catch(() => []),
+      YT_SEARCH_TIMEOUT_MS
+    ),
+    audiusService.searchSongs(query, limit).catch(() => []),
+    deezerService.searchSongs(query, limit).catch(() => []),
+  ]);
+
+  const full = mergeDedupe([ytResults, audiusResults], limit);
+  const seen = new Set(full.map((s) => s.videoId));
+  const previews = (deezerResults || []).filter((s) => s && !seen.has(s.videoId));
+  const results = [...full, ...previews].slice(0, limit);
 
   const songs = await Promise.all(results.map(r => upsertSong(r)));
 
@@ -148,32 +161,22 @@ const getTrendingSongsService = async (limit = 30) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  let results = [];
-  try {
-    const [audiusTrending, deezerTrending] = await Promise.all([
-      audiusService.getTrendingSongs(limit).catch(() => []),
-      deezerService.getTrendingSongs(limit).catch(() => []),
-    ]);
-    const seen = new Set();
-    for (const bucket of [audiusTrending, deezerTrending]) {
-      for (const s of bucket) {
-        if (!seen.has(s.videoId) && results.length < limit) {
-          seen.add(s.videoId);
-          results.push(s);
-        }
-      }
-    }
-    if (results.length < Math.min(limit, 10)) {
-      try {
-        const ytResults = await Promise.race([
-          youtubeService.getTrendingSongs(limit),
-          new Promise((res) => setTimeout(() => res([]), 4000)),
-        ]);
-        const ytSeen = new Set(results.map(r => r.videoId));
-        for (const s of (ytResults || [])) if (!ytSeen.has(s.videoId) && results.length < limit) results.push(s);
-      } catch (_) { /* ignore */ }
-    }
-  } catch (_) { /* ignore */ }
+  // YouTube + Audius full tracks first, Deezer 30s previews only as fill.
+  const [ytResults, audiusTrending, deezerTrending] = await Promise.all([
+    withTimeout(
+      youtubeService.getTrendingSongs(limit).catch(() => []),
+      YT_SEARCH_TIMEOUT_MS
+    ),
+    audiusService.getTrendingSongs(limit).catch(() => []),
+    deezerService.getTrendingSongs(limit).catch(() => []),
+  ]);
+
+  const full = mergeDedupe([ytResults, audiusTrending], limit);
+  const seen = new Set(full.map((s) => s.videoId));
+  const previews = (deezerTrending || []).filter((s) => s && !seen.has(s.videoId));
+  const results = [...full, ...previews].slice(0, limit);
+
+  if (!results.length) throw new Error('Failed to load trending songs');
 
   const songs = await Promise.all(results.map(r => upsertSong(r)));
 
@@ -241,27 +244,25 @@ const getSongsByGenre = async (genre, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  let results = [];
-  try {
-    const [audiusResults, deezerResults] = await Promise.all([
-      audiusService.searchSongs(`${genre} music`, limit).catch(() => []),
-      deezerService.searchSongs(`${genre} music`, limit).catch(() => []),
-    ]);
-    const seen = new Set();
-    for (const bucket of [audiusResults, deezerResults]) {
-      for (const s of bucket) if (!seen.has(s.videoId) && results.length < limit) { seen.add(s.videoId); results.push(s); }
-    }
-    if (!results.length) {
-      try {
-        results = await Promise.race([
-          youtubeService.searchByGenre(genre, limit),
-          new Promise((res) => setTimeout(() => res([]), 4000)),
-        ]);
-      } catch (_) { results = []; }
-    }
-  } catch (_) { results = []; }
-  if (!results.length) results = await Promise.race([youtubeService.searchByGenre(genre, limit), new Promise((res) => setTimeout(() => res([]), 4000))]).catch(() => []);
-  
+  // YouTube + Audius full tracks first, Deezer 30s previews only as fill.
+  const [ytResults, audiusResults, deezerResults] = await Promise.all([
+    withTimeout(
+      youtubeService.searchByGenre(genre, limit).catch(() => []),
+      YT_SEARCH_TIMEOUT_MS
+    ),
+    audiusService.searchSongs(`${genre} music`, limit).catch(() => []),
+    deezerService.searchSongs(`${genre} music`, limit).catch(() => []),
+  ]);
+
+  const full = mergeDedupe([ytResults, audiusResults], limit);
+  const seen = new Set(full.map((s) => s.videoId));
+  const previews = (deezerResults || []).filter((s) => s && !seen.has(s.videoId));
+  // Keep the old ">=3 full else fill with previews" spirit so niche genres
+  // still return something instead of an empty screen.
+  const results = full.length >= Math.min(limit, 3)
+    ? full
+    : [...full, ...previews].slice(0, limit);
+
   const songs = await Promise.all(results.map(r => upsertSong(r)));
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
