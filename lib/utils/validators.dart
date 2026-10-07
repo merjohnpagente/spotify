@@ -14,3 +14,20 @@ String? validateEmail(String? value) {
   }
   return null;
 }
+
+String? validatePassword(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Please enter your password';
+  }
+  if (value.length < 8) {
+    return 'Password must be at least 8 characters';
+  }
+  return null;
+}
+
+String? validateResetToken(String? value) {
+  if (value == null || value.trim().isEmpty) {
+    return 'Please enter the reset token from your email';
+  }
+  return null;
+}

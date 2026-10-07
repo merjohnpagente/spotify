@@ -10,6 +10,10 @@ const { errorHandler, notFoundHandler, globalLimiter } = require('./middleware')
 
 const app = express();
 
+// Behind Render/Heroku/etc. req.ip is the proxy IP unless trusted — without
+// this ALL clients share one rate-limit bucket (everyone blocked together).
+app.set('trust proxy', 1);
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(
   cors({

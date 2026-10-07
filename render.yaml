@@ -34,6 +34,10 @@ services:
       # Faster playback — avoid Render killing slow yt-dlp
       - key: REQUEST_TIMEOUT
         value: 90000
+      # Optional Redis (e.g. free Upstash) for shared cache across instances.
+      # Without it the API uses an in-process memory cache (single instance).
+      - key: REDIS_URL
+        sync: false
       # Firebase Auth + Firestore. FIREBASE_PROJECT_ID alone verifies Google
       # sign-in via public certs. For Firestore user mirroring, pick ONE after
       # downloading a service-account key (Firebase console > Project settings >

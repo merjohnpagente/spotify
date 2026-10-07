@@ -1,5 +1,5 @@
 const { Playlist, Song } = require('../models');
-const { getOrCreateSong } = require('./songService');
+const { getPublicSongsByIds } = require('./songService');
 const { deleteAvatar } = require('./imageService');
 const { cacheGet, cacheSet, cacheDelete, cacheDeletePattern } = require('../config/redis');
 
@@ -32,11 +32,8 @@ const getPlaylistById = async (playlistId, userId = null) => {
     throw new Error('Playlist not found');
   }
 
-  const songs = [];
-  for (const videoId of playlist.songIds) {
-    const song = await getOrCreateSong(videoId);
-    songs.push(song.toPublicJSON());
-  }
+  const byId = await getPublicSongsByIds(playlist.songIds);
+  const songs = playlist.songIds.map((id) => byId.get(id)).filter(Boolean);
 
   const result = { ...playlist.toPublicJSON(), songs };
   await cacheSet(cacheKey, result, 5 * 60);
@@ -114,7 +111,9 @@ const getUserPlaylists = async (userId, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
-  const playlists = await Playlist.find({ userId, isPublic: true })
+  // Owner sees ALL own playlists (public + private) — the isPublic filter
+  // here used to hide the owner's private lists from themselves.
+  const playlists = await Playlist.find({ userId })
     .sort({ createdAt: -1 })
     .limit(limit);
 
@@ -123,16 +122,17 @@ const getUserPlaylists = async (userId, limit = 20) => {
   return result;
 };
 
-const getPlaylistSongs = async (playlistId) => {
+const getPlaylistSongs = async (playlistId, userId = null) => {
   const playlist = await Playlist.findById(playlistId);
   if (!playlist) throw new Error('Playlist not found');
-
-  const songs = [];
-  for (const videoId of playlist.songIds) {
-    const song = await getOrCreateSong(videoId);
-    songs.push(song.toPublicJSON());
+  if (!playlist.isPublic && (!userId || playlist.userId.toString() !== String(userId))) {
+    const err = new Error('Not authorized to view this playlist');
+    err.statusCode = 403;
+    throw err;
   }
-  return songs;
+
+  const byId = await getPublicSongsByIds(playlist.songIds);
+  return playlist.songIds.map((id) => byId.get(id)).filter(Boolean);
 };
 
 const reorderPlaylistSongs = async (playlistId, userId, songIds) => {
@@ -141,10 +141,10 @@ const reorderPlaylistSongs = async (playlistId, userId, songIds) => {
   if (playlist.userId.toString() !== userId) throw new Error('Not authorized');
 
   playlist.songIds = songIds;
+  const byId = await getPublicSongsByIds(songIds);
   let totalDuration = 0;
-  for (const videoId of songIds) {
-    const song = await Song.findOne({ videoId });
-    if (song) totalDuration += song.duration;
+  for (const song of byId.values()) {
+    totalDuration += song.duration || 0;
   }
   playlist.totalDuration = totalDuration;
   await playlist.save();

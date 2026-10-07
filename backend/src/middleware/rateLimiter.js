@@ -31,6 +31,14 @@ const searchLimiter = createRateLimiter(
   'Too many search requests, please try again later'
 );
 
+// Stream/audio proxy burns yt-dlp CPU + bandwidth per request — cap it
+// separately so scrapers can't exhaust the extraction pool.
+const streamLimiter = createRateLimiter(
+  60 * 1000,
+  60,
+  'Too many playback requests, please try again later'
+);
+
 const apiLimiter = createRateLimiter(
   60 * 1000,
   30,
@@ -41,6 +49,7 @@ module.exports = {
   globalLimiter,
   authLimiter,
   searchLimiter,
+  streamLimiter,
   apiLimiter,
   createRateLimiter,
 };

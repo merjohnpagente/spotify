@@ -14,6 +14,12 @@ let server = null;
 
 const start = async () => {
   try {
+    // Fail fast with a clear message instead of a cryptic 500 on first login.
+    if (!config.jwt.accessSecret || !config.jwt.refreshSecret) {
+      throw new Error(
+        'JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be set (see backend/.env.example)'
+      );
+    }
     try {
       await connectDB();
     } catch (dbError) {
@@ -30,6 +36,11 @@ const start = async () => {
     server = app.listen(config.port, () => {
       console.log(`API server running on port ${config.port} (${config.nodeEnv})`);
     });
+
+    // Backstop so a hung upstream (yt-dlp, proxy) never holds a socket
+    // forever — honors REQUEST_TIMEOUT (Render sets 90000).
+    server.timeout = config.requestTimeout;
+    server.requestTimeout = config.requestTimeout;
 
     server.on('error', (error) => {
       console.error('Server error:', error);

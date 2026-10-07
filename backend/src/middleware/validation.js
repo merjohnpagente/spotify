@@ -38,6 +38,12 @@ const forgotPasswordValidation = [
   validate,
 ];
 
+const resetPasswordValidation = [
+  body('token').matches(/^[a-f0-9]{64}$/i).withMessage('Valid reset token required'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  validate,
+];
+
 const playlistValidation = [
   body('title').trim().isLength({ min: 1, max: 100 }).withMessage('Title required (1-100 chars)'),
   body('description').optional().trim().isLength({ max: 500 }).withMessage('Description max 500 chars'),
@@ -120,6 +126,7 @@ module.exports = {
   refreshTokenValidation,
   googleAuthValidation,
   forgotPasswordValidation,
+  resetPasswordValidation,
   playlistValidation,
   addSongValidation,
   updatePlaylistValidation,

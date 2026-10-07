@@ -51,29 +51,60 @@ const mergeDedupe = (buckets, limit) => {
   return out;
 };
 
+// Public shape for a track without touching Mongo (DB down / cold path).
+const toPublicSong = (ytData) => ({
+  id: null,
+  isAvailable: true,
+  addedToSystemAt: new Date(),
+  source: ytData.source || (ytData.videoId && ytData.videoId.startsWith('dz_') ? 'deezer' : ytData.videoId && ytData.videoId.startsWith('au_') ? 'audius' : 'youtube'),
+  isPreview: ytData.isPreview ?? (ytData.videoId && ytData.videoId.startsWith('dz_')),
+  ...ytData,
+});
+
 // Persist a YouTube song in MongoDB; if the DB is unavailable, degrade
 // gracefully and serve the YouTube data directly so music keeps playing.
+// Atomic upsert (no find-then-create race under concurrent searches).
 const upsertSong = async (ytData) => {
-  const publicData = {
-    id: null,
-    isAvailable: true,
-    addedToSystemAt: new Date(),
-    source: ytData.source || (ytData.videoId && ytData.videoId.startsWith('dz_') ? 'deezer' : ytData.videoId && ytData.videoId.startsWith('au_') ? 'audius' : 'youtube'),
-    isPreview: ytData.isPreview ?? (ytData.videoId && ytData.videoId.startsWith('dz_')),
-    ...ytData,
-  };
   if (!isDbReady()) {
-    return publicData;
+    return toPublicSong(ytData);
   }
   try {
-    let song = await Song.findOne({ videoId: ytData.videoId });
-    if (!song) {
-      song = await Song.create({ ...ytData, addedToSystemAt: new Date() });
-    }
-    return song.toPublicJSON();
+    const doc = await Song.findOneAndUpdate(
+      { videoId: ytData.videoId },
+      { $setOnInsert: { ...ytData, addedToSystemAt: new Date() } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    return doc.toPublicJSON();
   } catch (dbError) {
     console.warn('MongoDB unavailable, serving song without caching:', dbError.message);
-    return publicData;
+    return toPublicSong(ytData);
+  }
+};
+
+// Bulk version: ONE round-trip for a whole search page instead of N
+// sequential findOne+create pairs (20-30 DB round-trips per search).
+const upsertSongs = async (list) => {
+  if (!list.length) return [];
+  if (!isDbReady()) {
+    return list.map(toPublicSong);
+  }
+  try {
+    await Song.bulkWrite(
+      list.map((ytData) => ({
+        updateOne: {
+          filter: { videoId: ytData.videoId },
+          update: { $setOnInsert: { ...ytData, addedToSystemAt: new Date() } },
+          upsert: true,
+        },
+      })),
+      { ordered: false }
+    );
+    const docs = await Song.find({ videoId: { $in: list.map((s) => s.videoId) } });
+    const byId = new Map(docs.map((d) => [d.videoId, d.toPublicJSON()]));
+    return list.map((s) => byId.get(s.videoId) || toPublicSong(s));
+  } catch (dbError) {
+    console.warn('MongoDB unavailable, serving songs without caching:', dbError.message);
+    return list.map(toPublicSong);
   }
 };
 
@@ -115,18 +146,57 @@ const getOrCreateSong = async (videoId) => {
     };
   }
   let song = await Song.findOne({ videoId });
-  
+
   if (!song) {
     const data = await resolveSongById(videoId);
     if (!data) throw new Error('Song not found');
-    
-    song = await Song.create({
-      ...data,
-      addedToSystemAt: new Date(),
-    });
+
+    try {
+      song = await Song.create({
+        ...data,
+        addedToSystemAt: new Date(),
+      });
+    } catch (createError) {
+      // Lost a concurrent-insert race — the winner's row is what we want.
+      if (createError && createError.code === 11000) {
+        song = await Song.findOne({ videoId });
+      } else {
+        throw createError;
+      }
+    }
+    if (!song) throw new Error('Song not found');
   }
-  
+
   return song;
+};
+
+// Batch catalog lookup: ONE $in query for cached rows, missing rows resolved
+// in parallel (never one-by-one) and bulk-upserted. Returns
+// Map(videoId -> public song JSON); unresolvable ids are simply absent.
+const getPublicSongsByIds = async (videoIds) => {
+  const unique = [...new Set(videoIds)];
+  const out = new Map();
+  if (!unique.length) return out;
+
+  if (isDbReady()) {
+    try {
+      const docs = await Song.find({ videoId: { $in: unique } });
+      for (const d of docs) out.set(d.videoId, d.toPublicJSON());
+    } catch (_) {
+      // Fall through and resolve from sources below.
+    }
+  }
+  const missing = unique.filter((id) => !out.has(id));
+  if (!missing.length) return out;
+
+  const resolved = await Promise.all(
+    missing.map((id) => resolveSongById(id).catch(() => null))
+  );
+  const fresh = resolved.filter(Boolean);
+  if (!fresh.length) return out;
+  const upserted = await upsertSongs(fresh);
+  fresh.forEach((s, i) => out.set(s.videoId, upserted[i]));
+  return out;
 };
 
 // In-flight coalescing: concurrent identical requests share one promise so
@@ -165,7 +235,7 @@ const searchSongsService = async (query, limit = 20) => {
   const previews = (deezerResults || []).filter((s) => s && !seen.has(s.videoId));
   const results = [...full, ...previews].slice(0, limit);
 
-  const songs = await Promise.all(results.map(r => upsertSong(r)));
+  const songs = await upsertSongs(results);
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;
@@ -196,7 +266,7 @@ const getTrendingSongsService = async (limit = 30) => {
 
   if (!results.length) throw new Error('Failed to load trending songs');
 
-  const songs = await Promise.all(results.map(r => upsertSong(r)));
+  const songs = await upsertSongs(results);
 
   await cacheSet(cacheKey, songs, CACHE_TTL.TRENDING);
   return songs;
@@ -252,7 +322,7 @@ const getRecommendationsService = async (videoId, limit = 10) => {
     } catch (_) { /* ignore */ }
   }
   
-  const songs = await Promise.all(recommendations.map(r => upsertSong(r)));
+  const songs = await upsertSongs(recommendations);
 
   await cacheSet(cacheKey, songs, CACHE_TTL.RECOMMENDATIONS);
   return songs;
@@ -284,7 +354,7 @@ const getSongsByGenre = async (genre, limit = 20) => {
     ? full
     : [...full, ...previews].slice(0, limit);
 
-  const songs = await Promise.all(results.map(r => upsertSong(r)));
+  const songs = await upsertSongs(results);
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;
@@ -325,12 +395,9 @@ const getLikedSongs = async (userId, limit = 50) => {
 
   const likes = await UserLike.find({ userId }).sort({ likedAt: -1 }).limit(limit);
   const videoIds = likes.map(l => l.videoId);
-  
-  const songs = [];
-  for (const videoId of videoIds) {
-    const song = await getOrCreateSong(videoId);
-    songs.push(song.toPublicJSON());
-  }
+
+  const byId = await getPublicSongsByIds(videoIds);
+  const songs = videoIds.map((id) => byId.get(id)).filter(Boolean);
 
   await cacheSet(cacheKey, songs, 5 * 60);
   return songs;
@@ -338,8 +405,10 @@ const getLikedSongs = async (userId, limit = 50) => {
 
 const addToHistory = async (userId, videoId, playDuration, totalDuration) => {
   ensureDb();
-  await getOrCreateSong(videoId);
-  
+  // Warm the catalog in the background — the history write itself must never
+  // wait on a YouTube detail fetch.
+  getOrCreateSong(videoId).catch(() => {});
+
   const completed = playDuration >= totalDuration * 0.9;
   
   await UserHistory.create({
@@ -367,12 +436,14 @@ const getHistory = async (userId, limit = 50) => {
   if (cached) return cached;
 
   const history = await UserHistory.find({ userId }).sort({ playedAt: -1 }).limit(limit);
-  
+
+  const byId = await getPublicSongsByIds(history.map((e) => e.videoId));
   const songs = [];
   for (const entry of history) {
-    const song = await getOrCreateSong(entry.videoId);
+    const song = byId.get(entry.videoId);
+    if (!song) continue;
     songs.push({
-      ...song.toPublicJSON(),
+      ...song,
       playDuration: entry.playDuration,
       completed: entry.completed,
       playedAt: entry.playedAt,
@@ -400,25 +471,31 @@ const getUserStats = async (userId) => {
 
   const history = await UserHistory.find({ userId });
 
+  const byId = await getPublicSongsByIds(history.map((e) => e.videoId));
+
   const genreCount = {};
   const artistCount = {};
   const songCount = {};
 
   for (const entry of history) {
-    const song = await Song.findOne({ videoId: entry.videoId });
+    const song = byId.get(entry.videoId);
     if (song) {
       genreCount[song.genre] = (genreCount[song.genre] || 0) + 1;
       artistCount[song.artist] = (artistCount[song.artist] || 0) + 1;
-      songCount[song.videoId] = (songCount[song.videoId] || 0) + 1;
+      songCount[entry.videoId] = (songCount[entry.videoId] || 0) + 1;
     }
   }
 
   const topGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([genre, count]) => ({ genre, count }));
   const topArtists = Object.entries(artistCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([artist, count]) => ({ artist, count }));
-  const topSongs = Object.entries(songCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(async ([videoId, count]) => {
-    const song = await Song.findOne({ videoId });
-    return song ? { ...song.toPublicJSON(), playCount: count } : null;
-  });
+  const topSongs = Object.entries(songCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([videoId, count]) => {
+      const song = byId.get(videoId);
+      return song ? { ...song, playCount: count } : null;
+    })
+    .filter(Boolean);
 
   const stats = {
     totalListeningTime: user.stats.totalListeningTime,
@@ -426,7 +503,7 @@ const getUserStats = async (userId) => {
     likedSongsCount: user.stats.likedSongsCount,
     topGenres,
     topArtists,
-    topSongs: (await Promise.all(topSongs)).filter(Boolean),
+    topSongs,
   };
 
   await cacheSet(cacheKey, stats, 30 * 60);
@@ -441,6 +518,8 @@ module.exports = {
   clearAudioCache,
   getRecommendations: getRecommendationsService,
   getSongsByGenre,
+  getOrCreateSong,
+  getPublicSongsByIds,
   likeSong,
   unlikeSong,
   getLikedSongs,

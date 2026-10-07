@@ -7,6 +7,7 @@ const {
   refreshTokenValidation,
   googleAuthValidation,
   forgotPasswordValidation,
+  resetPasswordValidation,
   updateProfileValidation,
 } = require('../middleware');
 const authController = require('../controllers/authController');
@@ -19,6 +20,7 @@ router.post('/google', authLimiter, googleAuthValidation, authController.googleA
 router.post('/refresh', refreshTokenValidation, authController.refreshToken);
 router.post('/logout', authLimiter, refreshTokenValidation, authController.logout);
 router.post('/forgot-password', authLimiter, forgotPasswordValidation, authController.forgotPassword);
+router.post('/reset-password', authLimiter, resetPasswordValidation, authController.resetPassword);
 
 router.get('/me', authenticate, authController.getProfile);
 router.patch('/me', authenticate, updateProfileValidation, authController.updateProfile);

@@ -2,6 +2,8 @@ const express = require('express');
 const {
   authenticate,
   optionalAuth,
+  uploadPlaylistCover,
+  handleUploadError,
   playlistValidation,
   updatePlaylistValidation,
   addSongValidation,
@@ -20,9 +22,17 @@ router.get('/:playlistId', optionalAuth, playlistIdValidation, playlistControlle
 router.patch('/:playlistId', authenticate, playlistIdValidation, updatePlaylistValidation, playlistController.update);
 router.delete('/:playlistId', authenticate, playlistIdValidation, playlistController.remove);
 
-router.get('/:playlistId/songs', playlistIdValidation, playlistController.getPlaylistSongs);
+router.get('/:playlistId/songs', optionalAuth, playlistIdValidation, playlistController.getPlaylistSongs);
 router.post('/:playlistId/songs', authenticate, playlistIdValidation, addSongValidation, playlistController.addSong);
 router.delete('/:playlistId/songs/:videoId', authenticate, playlistIdValidation, videoIdValidation, playlistController.removeSong);
 router.put('/:playlistId/songs/reorder', authenticate, playlistIdValidation, reorderValidation, playlistController.reorder);
+router.post(
+  '/:playlistId/cover',
+  authenticate,
+  playlistIdValidation,
+  uploadPlaylistCover,
+  handleUploadError,
+  playlistController.uploadCover
+);
 
 module.exports = router;

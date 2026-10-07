@@ -78,7 +78,22 @@ class AuthService {
     return 'If the email exists, a reset link has been sent';
   }
 
-  Future<UserProfile> me() async {    final data = await _api.get('/api/auth/me');
+  /// Completes a password reset with the token from the reset email.
+  Future<String> resetPassword({required String token, required String password}) async {
+    final data = await _api.post(
+      '/api/auth/reset-password',
+      body: {'token': token.trim(), 'password': password},
+      auth: false,
+    );
+    if (data is Map<String, dynamic>) {
+      final message = data['message'] as String?;
+      if (message != null && message.isNotEmpty) return message;
+    }
+    return 'Password reset successfully. Please sign in again.';
+  }
+
+  Future<UserProfile> me() async {
+    final data = await _api.get('/api/auth/me');
     return UserProfile.fromJson(data as Map<String, dynamic>);
   }
 

@@ -19,7 +19,8 @@ const authenticate = async (req, res, next) => {
       user = await User.findById(decoded.uid);
       if (!user) return res.status(401).json({ error: 'User not found' });
       if (user.accountStatus !== 'active') return res.status(403).json({ error: 'Account suspended' });
-      await cacheSet(cacheKey, user.toPublicJSON(), 30 * 60);
+      // Short TTL so suspension/disabling takes effect within minutes.
+      await cacheSet(cacheKey, user.toPublicJSON(), 10 * 60);
     }
 
     req.user = user;
@@ -53,7 +54,7 @@ const optionalAuth = async (req, res, next) => {
     if (!user) {
       user = await User.findById(decoded.uid);
       if (user && user.accountStatus === 'active') {
-        await cacheSet(cacheKey, user.toPublicJSON(), 30 * 60);
+        await cacheSet(cacheKey, user.toPublicJSON(), 10 * 60);
         req.user = user;
         req.userId = decoded.uid;
       }
@@ -67,14 +68,4 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-    if (roles.length && !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Not authorized' });
-    }
-    next();
-  };
-};
-
-module.exports = { authenticate, optionalAuth, authorize };
+module.exports = { authenticate, optionalAuth };

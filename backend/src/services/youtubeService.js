@@ -85,22 +85,43 @@ const VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 let activeProcesses = 0;
 const pendingQueue = [];
 const MAX_CONCURRENT_PROCESSES = 3;
+// Never hang a request forever when the pool is saturated — fail fast
+// (503) so the client can retry instead of hanging until its own timeout.
+const ACQUIRE_TIMEOUT_MS = 20000;
 
-const acquire = () => new Promise((resolve) => {
+const acquire = (timeoutMs = ACQUIRE_TIMEOUT_MS) => new Promise((resolve, reject) => {
   if (activeProcesses < MAX_CONCURRENT_PROCESSES) {
     activeProcesses++;
     resolve();
-  } else {
-    pendingQueue.push(resolve);
+    return;
   }
+  const entry = { settled: false };
+  entry.timer = setTimeout(() => {
+    if (entry.settled) return;
+    entry.settled = true;
+    const i = pendingQueue.indexOf(entry);
+    if (i >= 0) pendingQueue.splice(i, 1);
+    const err = new Error('Server busy extracting audio, please retry');
+    err.statusCode = 503;
+    reject(err);
+  }, timeoutMs);
+  entry.resolve = () => {
+    if (entry.settled) return;
+    entry.settled = true;
+    clearTimeout(entry.timer);
+    resolve();
+  };
+  pendingQueue.push(entry);
 });
 
 const release = () => {
   activeProcesses--;
-  const next = pendingQueue.shift();
-  if (next) {
+  while (pendingQueue.length) {
+    const next = pendingQueue.shift();
+    if (next.settled) continue; // timed out already — skip
     activeProcesses++;
-    next();
+    next.resolve();
+    break;
   }
 };
 

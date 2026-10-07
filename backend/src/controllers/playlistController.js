@@ -1,4 +1,4 @@
-const { playlist } = require('../services');
+const { playlist, image } = require('../services');
 const catchAsync = require('../utils/catchAsync');
 
 const create = catchAsync(async (req, res) => {
@@ -39,12 +39,28 @@ const getMyPlaylists = catchAsync(async (req, res) => {
 });
 
 const getPlaylistSongs = catchAsync(async (req, res) => {
-  const songs = await playlist.getPlaylistSongs(req.params.playlistId);
+  const songs = await playlist.getPlaylistSongs(req.params.playlistId, req.userId || null);
   res.json({ results: songs });
 });
 
 const reorder = catchAsync(async (req, res) => {
   const result = await playlist.reorderPlaylistSongs(req.params.playlistId, req.userId, req.body.songIds);
+  res.json(result);
+});
+
+const uploadCover = catchAsync(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Cover image file required' });
+  }
+  const { secure_url: url } = await image.uploadPlaylistCover(req.file.buffer);
+  if (!url) {
+    return res.status(502).json({ error: 'Image upload failed' });
+  }
+  const result = await playlist.updatePlaylist(
+    req.params.playlistId,
+    req.userId,
+    { coverImageUrl: url }
+  );
   res.json(result);
 });
 
@@ -58,4 +74,5 @@ module.exports = {
   getMyPlaylists,
   getPlaylistSongs,
   reorder,
+  uploadCover,
 };

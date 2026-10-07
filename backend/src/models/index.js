@@ -6,6 +6,7 @@ const UserHistory = require('./UserHistory');
 const Follower = require('./Follower');
 const SearchHistory = require('./SearchHistory');
 const Session = require('./Session');
+const PasswordResetToken = require('./PasswordResetToken');
 
 module.exports = {
   User,
@@ -16,4 +17,5 @@ module.exports = {
   Follower,
   SearchHistory,
   Session,
+  PasswordResetToken,
 };

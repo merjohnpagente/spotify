@@ -58,3 +58,7 @@ android/app/google-services.json
 serviceAccountKey.json
 *firebase-adminsdk*.json
 *serviceaccount*.json
+
+# yt-dlp binaries are fetched at build time (render.yaml) or downloaded
+# per backend/.env.example — never commit 17MB+ platform binaries.
+backend/bin/

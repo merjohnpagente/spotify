@@ -1,6 +1,6 @@
-const { authenticate, optionalAuth, authorize } = require('./auth');
+const { authenticate, optionalAuth } = require('./auth');
 const { errorHandler, notFoundHandler, AppError } = require('./errorHandler');
-const { globalLimiter, authLimiter, searchLimiter, apiLimiter } = require('./rateLimiter');
+const { globalLimiter, authLimiter, searchLimiter, streamLimiter, apiLimiter } = require('./rateLimiter');
 const { uploadAvatar, uploadPlaylistCover, handleUploadError } = require('./upload');
 const {
   validate,
@@ -9,6 +9,7 @@ const {
   refreshTokenValidation,
   googleAuthValidation,
   forgotPasswordValidation,
+  resetPasswordValidation,
   playlistValidation,
   addSongValidation,
   updatePlaylistValidation,
@@ -26,13 +27,13 @@ const {
 module.exports = {
   authenticate,
   optionalAuth,
-  authorize,
   errorHandler,
   notFoundHandler,
   AppError,
   globalLimiter,
   authLimiter,
   searchLimiter,
+  streamLimiter,
   apiLimiter,
   uploadAvatar,
   uploadPlaylistCover,
@@ -43,6 +44,7 @@ module.exports = {
   refreshTokenValidation,
   googleAuthValidation,
   forgotPasswordValidation,
+  resetPasswordValidation,
   playlistValidation,
   addSongValidation,
   updatePlaylistValidation,

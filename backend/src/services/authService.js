@@ -1,8 +1,10 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const config = require('../config');
-const { User, Session } = require('../models');
+const { User, Session, PasswordResetToken } = require('../models');
 const { verifyIdToken, syncUserToFirestore } = require('../config/firebase');
 const { cacheSet, cacheGet, cacheDelete } = require('../config/redis');
+const { sendPasswordResetEmail } = require('./emailService');
 
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
@@ -20,10 +22,25 @@ const generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
+const parseExpiryToMs = (value, fallbackMs) => {
+  if (!value) return fallbackMs;
+  const m = String(value).trim().match(/^(\d+)\s*([smhd])$/i);
+  if (!m) {
+    const asNum = Number(value);
+    return Number.isFinite(asNum) && asNum > 0 ? asNum * 1000 : fallbackMs;
+  }
+  const n = parseInt(m[1], 10);
+  const mult = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+  return n * (mult[m[2].toLowerCase()] || 1000);
+};
+
 const storeRefreshToken = async (userId, refreshToken) => {
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(
+    Date.now() + parseExpiryToMs(config.jwt.refreshExpiry, 30 * 24 * 60 * 60 * 1000)
+  );
   await Session.create({ userId, refreshToken, expiresAt });
-  await cacheSet(`refresh:${userId}:${refreshToken}`, { userId }, 30 * 24 * 60 * 60);
+  const ttlSec = Math.max(60, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+  await cacheSet(`refresh:${userId}:${refreshToken}`, { userId }, ttlSec);
 };
 
 const verifyAccessToken = (token) => {
@@ -106,7 +123,10 @@ const loginWithGoogle = async (idToken) => {
     user = await User.create({
       email,
       username: await getUniqueUsername(username),
-      passwordHash: uid,
+      // Random unusable password — Google users must sign in via Google.
+      // (Storing the Firebase uid here would let anyone holding a uid log
+      // in with email+password.)
+      passwordHash: crypto.randomBytes(32).toString('hex'),
       firstName: name?.split(' ')[0] || 'User',
       lastName: name?.split(' ').slice(1).join(' ') || '',
       avatarUrl: picture,
@@ -154,6 +174,55 @@ const logout = async (refreshToken) => {
   await revokeRefreshToken(refreshToken);
 };
 
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h, matches the email wording
+
+/// Starts a password reset: stores only the token hash, emails the raw
+/// token. Always succeeds silently so accounts can't be enumerated.
+const requestPasswordReset = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) return;
+  await PasswordResetToken.deleteMany({ userId: user._id });
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  await PasswordResetToken.create({
+    userId: user._id,
+    tokenHash,
+    expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+  });
+  try {
+    await sendPasswordResetEmail(email, token);
+  } catch (mailError) {
+    console.warn('Reset email failed:', mailError.message);
+  }
+};
+
+/// Completes a password reset and revokes all sessions (forced re-login).
+const resetPassword = async (token, newPassword) => {
+  const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
+  const record = await PasswordResetToken.findOne({
+    tokenHash,
+    used: false,
+    expiresAt: { $gt: new Date() },
+  });
+  if (!record) {
+    const err = new Error('Invalid or expired reset token');
+    err.statusCode = 400;
+    throw err;
+  }
+  const user = await User.findById(record.userId);
+  if (!user) {
+    const err = new Error('User not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  user.passwordHash = newPassword; // pre-save hook bcrypt-hashes it
+  await user.save();
+  record.used = true;
+  await record.save();
+  await revokeAllUserTokens(user._id);
+  await cacheDelete(`user:${user._id}`);
+};
+
 const getUserProfile = async (userId) => {
   const cached = await cacheGet(`user:${userId}`);
   if (cached) return cached;
@@ -161,15 +230,24 @@ const getUserProfile = async (userId) => {
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
 
-  await cacheSet(`user:${userId}`, user.toPublicJSON(), 30 * 60);
+  await cacheSet(`user:${userId}`, user.toPublicJSON(), 10 * 60);
   return user.toPublicJSON();
 };
 
 const updateUserProfile = async (userId, updates) => {
-  const allowed = ['username', 'firstName', 'lastName', 'bio', 'avatarUrl', 'preferences'];
+  const allowed = ['username', 'firstName', 'lastName', 'bio', 'avatarUrl'];
   const updateData = {};
   for (const key of allowed) {
     if (updates[key] !== undefined) updateData[key] = updates[key];
+  }
+  // Merge preferences instead of replacing — a partial update (e.g. only
+  // audioQuality) must not wipe the other keys.
+  if (updates.preferences && typeof updates.preferences === 'object') {
+    const current = await User.findById(userId).select('preferences');
+    updateData.preferences = {
+      ...(current?.preferences ? current.preferences.toObject() : {}),
+      ...updates.preferences,
+    };
   }
 
   if (updateData.username) {
@@ -193,6 +271,8 @@ module.exports = {
   loginWithGoogle,
   refreshTokens,
   logout,
+  requestPasswordReset,
+  resetPassword,
   getUserProfile,
   updateUserProfile,
   revokeAllUserTokens,

@@ -59,11 +59,19 @@ const logout = async (req, res, next) => {
 const forgotPassword = async (req, res, next) => {
   try {
     const { email: userEmail } = req.body;
-    const { User } = require('../models');
-    await User.findOne({ email: userEmail });
-    // In a real app, generate a reset token and send email
-    // For now, just return success
+    // Generic reply either way — never reveal whether the email exists.
+    await auth.requestPasswordReset(userEmail);
     res.json({ message: 'If the email exists, a reset link has been sent' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+    await auth.resetPassword(token, password);
+    res.json({ message: 'Password reset successfully. Please sign in again.' });
   } catch (error) {
     next(error);
   }
@@ -94,6 +102,7 @@ module.exports = {
   refreshToken,
   logout,
   forgotPassword,
+  resetPassword,
   getProfile,
   updateProfile,
 };

@@ -39,9 +39,4 @@ const disconnectDB = async () => {
   console.log('MongoDB disconnected');
 };
 
-process.on('SIGINT', async () => {
-  await disconnectDB();
-  process.exit(0);
-});
-
 module.exports = { connectDB, disconnectDB };

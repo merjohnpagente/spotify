@@ -11,47 +11,48 @@ class WebAudioService {
     'https://vid.puffyan.us',
   ];
 
-  Future<String?> getAudioUrl(String videoId, {Duration timeout = const Duration(seconds: 8)}) async {
+  /// Direct attempt is ONE parallel round bounded by [timeout] (~4s): all
+  /// hosts race at once, first audio URL wins. On total failure we return
+  /// null fast so the player falls back to the server proxy immediately
+  /// instead of burning ~48s trying dead hosts one-by-one.
+  Future<String?> getAudioUrl(String videoId, {Duration timeout = const Duration(seconds: 4)}) async {
     if (videoId.startsWith('dz_') || videoId.startsWith('au_')) return null;
-    // Primary: Invidious via allorigins raw (bypasses CORS, no API key needed)
-    var url = await _tryInvidiousViaAllOrigins(videoId, timeout);
-    if (url != null) return url;
-    // Direct Invidious (if browser allows CORS — some instances set Access-Control-Allow-Origin:*)
-    url = await _tryDirectInvidious(videoId, timeout);
-    if (url != null) return url;
-    return null;
-  }
-
-  Future<String?> _tryInvidiousViaAllOrigins(String videoId, Duration timeout) async {
-    for (final host in _invidiousHosts) {
-      try {
-        final invUrl = '$host/api/v1/videos/$videoId';
-        final proxyUrl = 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(invUrl)}';
-        final resp = await http.get(Uri.parse(proxyUrl)).timeout(timeout);
-        if (resp.statusCode != 200) continue;
-        final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        final url = _pickInvidiousUrl(data);
+    try {
+      final results = await Future.wait([
+        ..._invidiousHosts.map((host) => _fetchViaAllOrigins(host, videoId, timeout)),
+        ..._invidiousHosts.map((host) => _fetchDirect(host, videoId, timeout)),
+      ]).timeout(timeout + const Duration(seconds: 1));
+      for (final url in results) {
         if (url != null) return url;
-      } catch (_) {
-        continue;
       }
+    } catch (_) {
+      // Timeout or failure — fall back to server proxy immediately.
     }
     return null;
   }
 
-  Future<String?> _tryDirectInvidious(String videoId, Duration timeout) async {
-    for (final host in _invidiousHosts) {
-      try {
-        final resp = await http.get(Uri.parse('$host/api/v1/videos/$videoId')).timeout(timeout);
-        if (resp.statusCode != 200) continue;
-        final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        final url = _pickInvidiousUrl(data);
-        if (url != null) return url;
-      } catch (_) {
-        continue;
-      }
+  Future<String?> _fetchViaAllOrigins(String host, String videoId, Duration timeout) async {
+    try {
+      final invUrl = '$host/api/v1/videos/$videoId';
+      final proxyUrl = 'https://api.allorigins.win/raw?url=${Uri.encodeComponent(invUrl)}';
+      final resp = await http.get(Uri.parse(proxyUrl)).timeout(timeout);
+      if (resp.statusCode != 200) return null;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      return _pickInvidiousUrl(data);
+    } catch (_) {
+      return null;
     }
-    return null;
+  }
+
+  Future<String?> _fetchDirect(String host, String videoId, Duration timeout) async {
+    try {
+      final resp = await http.get(Uri.parse('$host/api/v1/videos/$videoId')).timeout(timeout);
+      if (resp.statusCode != 200) return null;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      return _pickInvidiousUrl(data);
+    } catch (_) {
+      return null;
+    }
   }
 
   String? _pickInvidiousUrl(Map<String, dynamic> data) {
@@ -65,57 +66,5 @@ class WebAudioService {
     if (pick.isEmpty) return null;
     pick.sort((a, b) => ((b as Map)['bitrate'] as int? ?? 0).compareTo((a as Map)['bitrate'] as int? ?? 0));
     return (pick.first as Map)['url'] as String?;
-  }
-
-  // ignore: unused_element
-  Future<String?> _tryProxy(String proxyUrl, String videoId, Duration timeout) async {
-    try {
-      final body = jsonEncode({
-        'context': {
-          'client': {
-            'hl': 'en',
-            'gl': 'US',
-            'clientName': 'ANDROID',
-            'clientVersion': '19.09.37',
-            'androidSdkVersion': 30,
-            'userAgent': 'com.google.android.youtube/19.09.37 (Linux; UTV; SM-S911B) gzip',
-          }
-        },
-        'videoId': videoId,
-        'playbackContext': {
-          'contentPlaybackContext': {'html5Preference': 'HTML5_PREF_W_CON'}
-        },
-        'contentCheckOk': true,
-        'racyCheckOk': true,
-      });
-      final resp = await http
-          .post(Uri.parse(proxyUrl),
-              headers: {'Content-Type': 'application/json'}, body: body)
-          .timeout(timeout);
-      if (resp.statusCode != 200) return null;
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      final streamingData = data['streamingData'] as Map<String, dynamic>?;
-      if (streamingData == null) return null;
-      final List formats = [
-        ...?streamingData['adaptiveFormats'] as List?,
-        ...?streamingData['formats'] as List?,
-      ];
-      // Prefer audio mime
-      final audio = formats.where((f) {
-        final m = (f as Map)['mimeType']?.toString() ?? '';
-        final url = f['url'] as String?;
-        return url != null && m.contains('audio');
-      }).toList();
-      List pickFrom = audio.isNotEmpty ? audio : formats;
-      if (pickFrom.isEmpty) return null;
-      pickFrom.sort((a, b) {
-        final ba = (a as Map)['bitrate'] as int? ?? 0;
-        final bb = (b as Map)['bitrate'] as int? ?? 0;
-        return bb.compareTo(ba);
-      });
-      return (pickFrom.first as Map)['url'] as String?;
-    } catch (_) {
-      return null;
-    }
   }
 }

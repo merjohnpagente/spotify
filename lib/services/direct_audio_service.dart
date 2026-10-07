@@ -8,7 +8,9 @@ class DirectAudioService {
 
   /// Returns a direct googlevideo audio URL for [videoId], or null on failure.
   /// PureTuber does the same: calls youtubei player endpoint directly on-device (~0.5-1s).
-  Future<String?> getAudioUrl(String videoId, {Duration timeout = const Duration(seconds: 20)}) async {
+  /// Short timeout so a blocked youtubei fails FAST and playback falls back
+  /// to the server without the user waiting 20s staring at a spinner.
+  Future<String?> getAudioUrl(String videoId, {Duration timeout = const Duration(seconds: 10)}) async {
     if (videoId.startsWith('dz_') || videoId.startsWith('au_')) return null;
     try {
       final manifest = await _client.videos.streamsClient
