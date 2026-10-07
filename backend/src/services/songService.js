@@ -129,10 +129,25 @@ const getOrCreateSong = async (videoId) => {
   return song;
 };
 
+// In-flight coalescing: concurrent identical requests share one promise so
+// a remount/double-tap never spawns duplicate yt-dlp processes.
+const pending = new Map();
+const coalesce = (key, fn) => {
+  const existing = pending.get(key);
+  if (existing) return existing;
+  const p = fn().finally(() => {
+    if (pending.get(key) === p) pending.delete(key);
+  });
+  pending.set(key, p);
+  return p;
+};
+
 const searchSongsService = async (query, limit = 20) => {
   const cacheKey = `search:${query}:${limit}`;
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
+
+  return coalesce(cacheKey, async () => {
 
   // YouTube FIRST (full songs) + Audius (full tracks) in parallel, Deezer
   // 30s previews only as last fill to reach `limit`.
@@ -154,12 +169,15 @@ const searchSongsService = async (query, limit = 20) => {
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;
+  });
 };
 
 const getTrendingSongsService = async (limit = 30) => {
   const cacheKey = `trending:${limit}`;
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
+
+  return coalesce(cacheKey, async () => {
 
   // YouTube + Audius full tracks first, Deezer 30s previews only as fill.
   const [ytResults, audiusTrending, deezerTrending] = await Promise.all([
@@ -182,6 +200,7 @@ const getTrendingSongsService = async (limit = 30) => {
 
   await cacheSet(cacheKey, songs, CACHE_TTL.TRENDING);
   return songs;
+  });
 };
 
 const getSongByIdService = async (videoId) => {
@@ -244,6 +263,8 @@ const getSongsByGenre = async (genre, limit = 20) => {
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
+  return coalesce(cacheKey, async () => {
+
   // YouTube + Audius full tracks first, Deezer 30s previews only as fill.
   const [ytResults, audiusResults, deezerResults] = await Promise.all([
     withTimeout(
@@ -267,6 +288,7 @@ const getSongsByGenre = async (genre, limit = 20) => {
 
   await cacheSet(cacheKey, songs, CACHE_TTL.SEARCH);
   return songs;
+  });
 };
 
 const likeSong = async (userId, videoId) => {
